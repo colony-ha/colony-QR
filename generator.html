@@ -104,27 +104,26 @@ function fields(){
 function detectedSocialBrand(){
  const raw=currentType==='social'?val('socialUrl'):currentType==='url'?val('content'):'';
  if(!raw)return null;
- let host='';try{host=new URL(/^https?:\/\//i.test(raw)?raw:'https://'+raw).hostname.toLowerCase().replace(/^www\./,'')}catch(_){return null}
+ let host='';try{host=new URL(/^https?:\\/\\//i.test(raw)?raw:'https://'+raw).hostname.toLowerCase().replace(/^www\\./,'')}catch(_){return null}
  const brands=[
-  {match:/facebook\.com$|fb\.com$/,name:'Facebook',glyph:'f',bg:'#1877F2'},
-  {match:/instagram\.com$/,name:'Instagram',glyph:'◎',bg:'#C13584'},
-  {match:/whatsapp\.com$|wa\.me$/,name:'WhatsApp',glyph:'WA',bg:'#25D366'},
-  {match:/tiktok\.com$/,name:'TikTok',glyph:'♪',bg:'#111111'},
-  {match:/youtube\.com$|youtu\.be$/,name:'YouTube',glyph:'▶',bg:'#FF0033'},
-  {match:/linkedin\.com$/,name:'LinkedIn',glyph:'in',bg:'#0A66C2'},
-  {match:/(^|\.)x\.com$|twitter\.com$/,name:'X',glyph:'X',bg:'#111111'},
-  {match:/t\.me$|telegram\.org$/,name:'Telegram',glyph:'➤',bg:'#229ED9'},
-  {match:/pinterest\.com$/,name:'Pinterest',glyph:'P',bg:'#E60023'},
-  {match:/snapchat\.com$/,name:'Snapchat',glyph:'S',bg:'#FFFC00'}
+  {match:/(^|\\.)facebook\\.com$|(^|\\.)fb\\.com$/,slug:'facebook',color:'0866FF'},
+  {match:/(^|\\.)instagram\\.com$/,slug:'instagram',color:'E4405F'},
+  {match:/(^|\\.)whatsapp\\.com$|(^|\\.)wa\\.me$/,slug:'whatsapp',color:'25D366'},
+  {match:/(^|\\.)tiktok\\.com$/,slug:'tiktok',color:'000000'},
+  {match:/(^|\\.)youtube\\.com$|(^|\\.)youtu\\.be$/,slug:'youtube',color:'FF0000'},
+  {match:/(^|\\.)linkedin\\.com$/,slug:'linkedin',color:'0A66C2'},
+  {match:/(^|\\.)x\\.com$|(^|\\.)twitter\\.com$/,slug:'x',color:'000000'},
+  {match:/(^|\\.)t\\.me$|(^|\\.)telegram\\.org$/,slug:'telegram',color:'26A5E4'},
+  {match:/(^|\\.)pinterest\\.com$/,slug:'pinterest',color:'BD081C'},
+  {match:/(^|\\.)snapchat\\.com$/,slug:'snapchat',color:'000000'}
  ];
  return brands.find(b=>b.match.test(host))||null;
 }
 function automaticSocialIcon(){
  if(!$('autoSocialIcon')?.checked||logoDataUrl)return null;
  const brand=detectedSocialBrand();if(!brand)return null;
- const color=brand.name==='Snapchat'?'#111111':'#ffffff';
- const svg='<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128"><rect x="4" y="4" width="120" height="120" rx="28" fill="'+brand.bg+'"/><text x="64" y="83" text-anchor="middle" font-family="Arial,sans-serif" font-size="'+(brand.glyph.length>1?42:76)+'" font-weight="700" fill="'+color+'">'+brand.glyph+'</text></svg>';
- return 'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);
+ // Official brand SVG artwork from Simple Icons CDN; no hand-drawn letters or badges.
+ return 'https://cdn.simpleicons.org/'+brand.slug+'/'+brand.color;
 }
 function render(){
  if(!window.QRCodeStyling)return;

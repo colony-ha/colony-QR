@@ -104,18 +104,18 @@ function fields(){
 function detectedSocialBrand(){
  const raw=currentType==='social'?val('socialUrl'):currentType==='url'?val('content'):'';
  if(!raw)return null;
- let host='';try{host=new URL(/^https?:\\/\\//i.test(raw)?raw:'https://'+raw).hostname.toLowerCase().replace(/^www\\./,'')}catch(_){return null}
+ let host='';try{host=new URL(/^https?:\/\//i.test(raw)?raw:'https://'+raw).hostname.toLowerCase().replace(/^www\./,'')}catch(_){return null}
  const brands=[
-  {match:/(^|\\.)facebook\\.com$|(^|\\.)fb\\.com$/,slug:'facebook',color:'0866FF'},
-  {match:/(^|\\.)instagram\\.com$/,slug:'instagram',color:'E4405F'},
-  {match:/(^|\\.)whatsapp\\.com$|(^|\\.)wa\\.me$/,slug:'whatsapp',color:'25D366'},
-  {match:/(^|\\.)tiktok\\.com$/,slug:'tiktok',color:'000000'},
-  {match:/(^|\\.)youtube\\.com$|(^|\\.)youtu\\.be$/,slug:'youtube',color:'FF0000'},
-  {match:/(^|\\.)linkedin\\.com$/,slug:'linkedin',color:'0A66C2'},
-  {match:/(^|\\.)x\\.com$|(^|\\.)twitter\\.com$/,slug:'x',color:'000000'},
-  {match:/(^|\\.)t\\.me$|(^|\\.)telegram\\.org$/,slug:'telegram',color:'26A5E4'},
-  {match:/(^|\\.)pinterest\\.com$/,slug:'pinterest',color:'BD081C'},
-  {match:/(^|\\.)snapchat\\.com$/,slug:'snapchat',color:'000000'}
+  {match:/(^|\.)facebook\.com$|(^|\.)fb\.com$/,slug:'facebook',color:'0866FF'},
+  {match:/(^|\.)instagram\.com$/,slug:'instagram',color:'E4405F'},
+  {match:/(^|\.)whatsapp\.com$|(^|\.)wa\.me$/,slug:'whatsapp',color:'25D366'},
+  {match:/(^|\.)tiktok\.com$/,slug:'tiktok',color:'000000'},
+  {match:/(^|\.)youtube\.com$|(^|\.)youtu\.be$/,slug:'youtube',color:'FF0000'},
+  {match:/(^|\.)linkedin\.com$/,slug:'linkedin',color:'0A66C2'},
+  {match:/(^|\.)x\.com$|(^|\.)twitter\.com$/,slug:'x',color:'000000'},
+  {match:/(^|\.)t\.me$|(^|\.)telegram\.org$/,slug:'telegram',color:'26A5E4'},
+  {match:/(^|\.)pinterest\.com$/,slug:'pinterest',color:'BD081C'},
+  {match:/(^|\.)snapchat\.com$/,slug:'snapchat',color:'000000'}
  ];
  return brands.find(b=>b.match.test(host))||null;
 }

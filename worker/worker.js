@@ -902,6 +902,22 @@ async function handleDigitalPages(request, env, headers, url) {
       return reply({ success: false, error: "Invalid JSON body" }, 400, headers);
     }
 
+    const planLimit = subscription.plan_code === "business" ? 5 : 1;
+    const pageCount = await env.DB.prepare(
+      "SELECT COUNT(*) AS total FROM digital_pages WHERE user_id = ?"
+    ).bind(user.id).first();
+    if (Number(pageCount?.total || 0) >= planLimit) {
+      return reply({
+        success: false,
+        error: subscription.plan_code === "business"
+          ? "Business plan allows up to 5 digital pages"
+          : "Pro plan allows only 1 digital page",
+        code: "DIGITAL_PAGE_LIMIT",
+        limit: planLimit,
+        current: Number(pageCount?.total || 0)
+      }, 403, headers);
+    }
+
     const fields = cleanPageInput(body);
     if (!fields.title || fields.title.length < 2) {
       return reply({ success: false, error: "Page title must contain at least 2 characters" }, 400, headers);
@@ -2615,22 +2631,57 @@ async function adminUpdateSubscription(
 
     const oldPlan = subscription.plan_code;
 
-    await env.DB.prepare(`
-      UPDATE subscriptions
-      SET plan_code = ?,
-          updated_at = ?
-      WHERE id = ?
-    `).bind(
-      planCode,
-      now,
-      subscriptionId
-    ).run();
+    if (planCode === "free") {
+      // Free takes effect immediately: revoke every active paid grant for this user.
+      await env.DB.prepare(`
+        UPDATE subscriptions
+        SET status = 'cancelled',
+            ends_at = ?,
+            auto_renew = 0,
+            updated_at = ?
+        WHERE user_id = ?
+          AND status IN ('active', 'paused')
+      `).bind(now, now, subscription.user_id).run();
 
-    message = "Subscription plan changed";
+      await env.DB.prepare(`
+        UPDATE subscriptions
+        SET plan_code = 'free',
+            status = 'cancelled',
+            starts_at = ?,
+            ends_at = ?,
+            auto_renew = 0,
+            updated_at = ?
+        WHERE id = ?
+      `).bind(now, now, now, subscriptionId).run();
+    } else {
+      // A single active subscription controls the user's current plan.
+      await env.DB.prepare(`
+        UPDATE subscriptions
+        SET status = 'cancelled',
+            ends_at = ?,
+            auto_renew = 0,
+            updated_at = ?
+        WHERE user_id = ?
+          AND id <> ?
+          AND status = 'active'
+      `).bind(now, now, subscription.user_id, subscriptionId).run();
+
+      await env.DB.prepare(`
+        UPDATE subscriptions
+        SET plan_code = ?,
+            status = 'active',
+            starts_at = ?,
+            updated_at = ?
+        WHERE id = ?
+      `).bind(planCode, now, now, subscriptionId).run();
+    }
+
+    message = "Subscription plan changed immediately";
     auditAction = "subscription_plan_changed";
     auditDetails = {
       old_plan: oldPlan,
-      new_plan: planCode
+      new_plan: planCode,
+      effective_immediately: true
     };
   } else {
     return reply({

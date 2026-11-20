@@ -3136,7 +3136,7 @@ export default {
       }
 
       const adminDeleteMatch = url.pathname.match(
-        /^\\/api\\/admin\\/users\\/([a-f0-9-]{36})$/i
+        /^\/api\/admin\/users\/([a-f0-9-]{36})$/i
       );
 
       if (

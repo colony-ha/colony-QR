@@ -725,7 +725,7 @@ async function googleLogin(request, env, headers) {
 async function requireDigitalAccess(env, userId) {
   const now = new Date().toISOString();
   const subscription = await env.DB.prepare(`
-    SELECT id, plan_code, ends_at
+    SELECT id, plan_code, ends_at, source, grant_reason
     FROM subscriptions
     WHERE user_id = ?
       AND status = 'active'
@@ -3061,9 +3061,14 @@ export default {
           }, 401, headers);
         }
 
+        const subscription = await requireDigitalAccess(env, user.id);
+
         return reply({
           success: true,
-          user
+          user: {
+            ...user,
+            subscription
+          }
         }, 200, headers);
       }
 

@@ -1032,8 +1032,11 @@ async function handleDigitalPages(request, env, headers, url) {
     }
 
     if (request.method === "DELETE") {
+      // The ownership check above ensures customers can only delete their own page.
+      // Delete its products and services first, then remove the page itself.
+      await env.DB.prepare("DELETE FROM digital_page_items WHERE page_id = ?").bind(pageId).run();
       await env.DB.prepare("DELETE FROM digital_pages WHERE id = ? AND user_id = ?").bind(pageId, user.id).run();
-      return reply({ success: true, message: "Digital page deleted" }, 200, headers);
+      return reply({ success: true, message: "Digital page and its items deleted" }, 200, headers);
     }
   }
 

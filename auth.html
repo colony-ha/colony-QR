@@ -75,7 +75,7 @@ $("authForm").onsubmit=async e=>{
   const response=await fetch(API+(mode==="login"?"/api/auth/login":"/api/auth/register"),{method:"POST",headers:{"Content-Type":"application/json"},credentials:"include",body:JSON.stringify(payload)});
   const data=await response.json();
   if(!response.ok){showMessage(data.error&&data.error.toLowerCase().includes("username already taken")?t.usernameTaken:(data.error==="Invalid email or password"?t.invalid:(data.error||t.generic)),"error")}
-  else{showMessage(mode==="login"?t.logged:t.created,"ok");setTimeout(()=>{window.location.href="dashboard.html"},500)}
+  else{showMessage(mode==="login"?t.logged:t.created,"ok");setTimeout(()=>{window.location.href=postLoginDestination()},500)}
  }catch(err){showMessage(t.network,"error")}
  finally{button.disabled=false}
 };
@@ -95,7 +95,7 @@ async function handleGoogleCredential(response, nonce) {
       return;
     }
     showMessage(t.logged, "ok");
-    setTimeout(() => { window.location.href = "dashboard.html"; }, 500);
+    setTimeout(() => { window.location.href = postLoginDestination(); }, 500);
   } catch (error) {
     showMessage(t.network, "error");
   }

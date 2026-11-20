@@ -1826,6 +1826,136 @@ async function adminSubscriptions(
 }
 
 // ==========================================
+// DIGITAL PAGE EXTENSION REQUESTS
+// ==========================================
+
+async function userExtensionRequests(request, env, headers) {
+  const user = await currentUser(request, env);
+  if (!user) return reply({ success: false, error: "Authentication required" }, 401, headers);
+
+  if (request.method === "GET") {
+    const result = await env.DB.prepare(`
+      SELECT id, requested_days, message, status, admin_note, created_at, reviewed_at
+      FROM subscription_extension_requests
+      WHERE user_id = ?
+      ORDER BY created_at DESC
+      LIMIT 20
+    `).bind(user.id).all();
+    return reply({ success: true, requests: result.results || [] }, 200, headers);
+  }
+
+  if (request.method !== "POST") return reply({ success: false, error: "Method not allowed" }, 405, headers);
+
+  const access = await requireDigitalAccess(env, user.id);
+  if (access) return reply({ success: false, error: "Your subscription is already active" }, 409, headers);
+
+  const body = await readJson(request);
+  if (!body) return reply({ success: false, error: "Invalid JSON body" }, 400, headers);
+
+  const requestedDays = Number(body.requested_days ?? 7);
+  const message = String(body.message || "").trim().slice(0, 1000);
+  if (!Number.isInteger(requestedDays) || requestedDays < 1 || requestedDays > 30) {
+    return reply({ success: false, error: "Requested days must be between 1 and 30" }, 400, headers);
+  }
+
+  const pending = await env.DB.prepare(`
+    SELECT id FROM subscription_extension_requests
+    WHERE user_id = ? AND status = 'pending'
+    LIMIT 1
+  `).bind(user.id).first();
+  if (pending) return reply({ success: false, error: "You already have a pending request" }, 409, headers);
+
+  const id = crypto.randomUUID();
+  const now = new Date().toISOString();
+  await env.DB.prepare(`
+    INSERT INTO subscription_extension_requests
+      (id, user_id, requested_days, message, status, admin_note, created_at, updated_at)
+    VALUES (?, ?, ?, ?, 'pending', '', ?, ?)
+  `).bind(id, user.id, requestedDays, message, now, now).run();
+
+  return reply({ success: true, request: { id, requested_days: requestedDays, message, status: "pending", created_at: now } }, 201, headers);
+}
+
+async function adminExtensionRequests(request, env, headers) {
+  const access = await requireSuperAdmin(request, env);
+  if (!access.ok) return reply({ success: false, error: access.error }, access.status, headers);
+
+  const result = await env.DB.prepare(`
+    SELECT r.id, r.user_id, r.requested_days, r.message, r.status,
+           r.admin_note, r.created_at, r.reviewed_at,
+           u.email AS user_email, u.display_name AS user_name
+    FROM subscription_extension_requests r
+    JOIN users u ON u.id = r.user_id
+    ORDER BY CASE WHEN r.status = 'pending' THEN 0 ELSE 1 END, r.created_at DESC
+    LIMIT 200
+  `).all();
+  return reply({ success: true, requests: result.results || [] }, 200, headers);
+}
+
+async function adminReviewExtensionRequest(request, env, headers, requestId) {
+  const access = await requireSuperAdmin(request, env);
+  if (!access.ok) return reply({ success: false, error: access.error }, access.status, headers);
+
+  const body = await readJson(request);
+  if (!body) return reply({ success: false, error: "Invalid JSON body" }, 400, headers);
+
+  const decision = String(body.decision || "").toLowerCase();
+  const adminNote = String(body.admin_note || "").trim().slice(0, 500);
+  if (!["approve", "reject"].includes(decision)) {
+    return reply({ success: false, error: "Decision must be approve or reject" }, 400, headers);
+  }
+
+  const row = await env.DB.prepare(`
+    SELECT id, user_id, requested_days, status
+    FROM subscription_extension_requests WHERE id = ? LIMIT 1
+  `).bind(requestId).first();
+  if (!row) return reply({ success: false, error: "Request not found" }, 404, headers);
+  if (row.status !== "pending") return reply({ success: false, error: "This request has already been reviewed" }, 409, headers);
+
+  const now = new Date().toISOString();
+  const status = decision === "approve" ? "approved" : "rejected";
+
+  if (decision === "approve") {
+    const active = await requireDigitalAccess(env, row.user_id);
+    if (active) return reply({ success: false, error: "User already has an active Pro or Business subscription" }, 409, headers);
+
+    const subscriptionId = crypto.randomUUID();
+    const endsAt = addDays(new Date(now), row.requested_days);
+    await env.DB.batch([
+      env.DB.prepare(`
+        UPDATE subscription_extension_requests
+        SET status = 'approved', admin_note = ?, reviewed_by = ?, reviewed_at = ?, updated_at = ?
+        WHERE id = ? AND status = 'pending'
+      `).bind(adminNote, access.user.id, now, now, requestId),
+      env.DB.prepare(`
+        INSERT INTO subscriptions
+          (id, user_id, plan_code, source, status, starts_at, ends_at, auto_renew,
+           provider, provider_subscription_id, granted_by_user_id, grant_reason, created_at, updated_at)
+        SELECT ?, ?, 'pro', 'admin_granted', 'active', ?, ?, 0, NULL, NULL, ?, ?, ?, ?
+        WHERE EXISTS (
+          SELECT 1 FROM subscription_extension_requests
+          WHERE id = ? AND status = 'approved' AND reviewed_by = ?
+        )
+      `).bind(subscriptionId, row.user_id, now, endsAt, access.user.id,
+        "Approved free extension request", now, now, requestId, access.user.id)
+    ]);
+    await writeAudit(env, access.user.id, row.user_id, "digital_page_extension_approved", {
+      request_id: requestId, subscription_id: subscriptionId, duration_days: row.requested_days, admin_note: adminNote
+    });
+  } else {
+    const updated = await env.DB.prepare(`
+      UPDATE subscription_extension_requests
+      SET status = 'rejected', admin_note = ?, reviewed_by = ?, reviewed_at = ?, updated_at = ?
+      WHERE id = ? AND status = 'pending'
+    `).bind(adminNote, access.user.id, now, now, requestId).run();
+    if (!updated.meta?.changes) return reply({ success: false, error: "This request has already been reviewed" }, 409, headers);
+    await writeAudit(env, access.user.id, row.user_id, "digital_page_extension_rejected", { request_id: requestId, admin_note: adminNote });
+  }
+
+  return reply({ success: true, status }, 200, headers);
+}
+
+// ==========================================
 // ADMIN: FIND USER
 // ==========================================
 
@@ -2813,6 +2943,31 @@ export default {
           success: true,
           message: "Logged out"
         }, 200, headers);
+      }
+
+      // ======================================
+      // DIGITAL PAGE EXTENSION REQUESTS
+      // ======================================
+
+      if (
+        url.pathname === "/api/digital-page-extension-requests" &&
+        ["GET", "POST"].includes(request.method)
+      ) {
+        return await userExtensionRequests(request, env, headers);
+      }
+
+      if (
+        url.pathname === "/api/admin/digital-page-extension-requests" &&
+        request.method === "GET"
+      ) {
+        return await adminExtensionRequests(request, env, headers);
+      }
+
+      const extensionReviewMatch = url.pathname.match(
+        /^\/api\/admin\/digital-page-extension-requests\/([a-f0-9-]{36})\/review$/i
+      );
+      if (extensionReviewMatch && request.method === "POST") {
+        return await adminReviewExtensionRequest(request, env, headers, extensionReviewMatch[1]);
       }
 
       // ======================================

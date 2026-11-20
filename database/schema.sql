@@ -1,5 +1,3 @@
-PRAGMA foreign_keys = ON;
-
 -- COLONY QR initial account and entitlement schema.
 -- Apply this migration to a new Cloudflare D1 database.
 

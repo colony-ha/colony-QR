@@ -161,7 +161,7 @@ function getCookie(request, name) {
 }
 
 function sessionCookie(token, maxAge) {
-  return `colony_session=${token}; HttpOnly; Secure; SameSite=None; Partitioned; Path=/; Max-Age=${maxAge}`;
+  return `colony_session=${token}; HttpOnly; Secure; SameSite=None; Path=/; Max-Age=${maxAge}`;
 }
 
 async function readJson(request) {

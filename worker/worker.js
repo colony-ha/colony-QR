@@ -192,6 +192,44 @@ function addDays(date, days) {
   ).toISOString();
 }
 
+async function grantSignupTrial(env, userId) {
+  const existing = await env.DB.prepare(`
+    SELECT trial_granted_at
+    FROM users
+    WHERE id = ?
+    LIMIT 1
+  `).bind(userId).first();
+
+  if (!existing || existing.trial_granted_at) return null;
+
+  const now = new Date();
+  const startsAt = now.toISOString();
+  const endsAt = addDays(now, 3);
+  const subscriptionId = crypto.randomUUID();
+
+  await env.DB.prepare(`
+    INSERT INTO subscriptions (
+      id, user_id, plan_code, source, status,
+      starts_at, ends_at, auto_renew, provider,
+      provider_subscription_id, granted_by_user_id,
+      grant_reason, created_at, updated_at
+    )
+    VALUES (?, ?, 'pro', 'admin_granted', 'active',
+            ?, ?, 0, NULL, NULL, NULL,
+            'Automatic 3-day Pro trial', ?, ?)
+  `).bind(
+    subscriptionId, userId, startsAt, endsAt, startsAt, startsAt
+  ).run();
+
+  await env.DB.prepare(`
+    UPDATE users
+    SET trial_granted_at = ?, updated_at = ?
+    WHERE id = ? AND trial_granted_at IS NULL
+  `).bind(startsAt, startsAt, userId).run();
+
+  return { id: subscriptionId, starts_at: startsAt, ends_at: endsAt };
+}
+
 // ==========================================
 // SESSION MANAGEMENT
 // ==========================================
@@ -625,6 +663,8 @@ async function googleLogin(request, env, headers) {
       google.sub
     ).run();
 
+    await grantSignupTrial(env, userId);
+
     user = {
       id: userId,
       email: google.email,
@@ -775,13 +815,22 @@ async function handleDigitalPages(request, env, headers, url) {
   const publicMatch = path.match(/^\/api\/public\/digital-pages\/([a-z0-9-]{1,70})$/i);
   if (publicMatch && request.method === "GET") {
     const page = await env.DB.prepare(`
-      SELECT id, title, slug, business_category, description, phone,
-             whatsapp, email, website, address, maps_url, logo_url,
-             cover_image_url, theme_json, social_links_json, updated_at
-      FROM digital_pages
-      WHERE slug = ? AND status = 'published'
+      SELECT p.id, p.title, p.slug, p.business_category, p.description, p.phone,
+             p.whatsapp, p.email, p.website, p.address, p.maps_url, p.logo_url,
+             p.cover_image_url, p.theme_json, p.social_links_json, p.updated_at
+      FROM digital_pages p
+      WHERE p.slug = ? AND p.status = 'published'
+        AND EXISTS (
+          SELECT 1
+          FROM subscriptions s
+          WHERE s.user_id = p.user_id
+            AND s.status = 'active'
+            AND s.plan_code IN ('pro', 'business')
+            AND s.starts_at <= ?
+            AND (s.ends_at IS NULL OR s.ends_at > ?)
+        )
       LIMIT 1
-    `).bind(publicMatch[1]).first();
+    `).bind(publicMatch[1], now, now).first();
 
     if (!page) {
       return reply({ success: false, error: "Page not found" }, 404, headers);
@@ -2568,6 +2617,8 @@ export default {
           salt,
           PASSWORD_ITERATIONS
         ).run();
+
+        await grantSignupTrial(env, userId);
 
         const token = await createSession(env, userId);
 

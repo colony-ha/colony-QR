@@ -627,6 +627,20 @@ async function googleLogin(request, env, headers) {
       }, 409, headers);
     }
 
+    const existingUsername = await env.DB.prepare(`
+      SELECT id
+      FROM users
+      WHERE lower(trim(display_name)) = lower(trim(?))
+      LIMIT 1
+    `).bind(google.name).first();
+
+    if (existingUsername) {
+      return reply({
+        success: false,
+        error: "Username already taken. Please sign up with email and choose another username."
+      }, 409, headers);
+    }
+
     const userId = crypto.randomUUID();
     const salt = randomHex(16);
     const randomPassword = randomHex(64);
@@ -2722,6 +2736,20 @@ export default {
           return reply({
             success: false,
             error: "An account with this email already exists"
+          }, 409, headers);
+        }
+
+        const existingUsername = await env.DB.prepare(`
+          SELECT id
+          FROM users
+          WHERE lower(trim(display_name)) = lower(trim(?))
+          LIMIT 1
+        `).bind(displayName).first();
+
+        if (existingUsername) {
+          return reply({
+            success: false,
+            error: "Username already taken. Please choose another."
           }, 409, headers);
         }
 

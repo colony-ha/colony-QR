@@ -57,9 +57,11 @@ COLONY QR is a multilingual QR platform for a global audience.
 8. Testing, security review, and launch.
 
 ## Current implementation status
-- Existing QR generator prototype is in `index.html`.
+- Public landing page is in `index.html`.
+- QR generator is preserved in `generator.html`.
 - Existing QR generator must be preserved when the public landing page is introduced (move it to a dedicated generator page rather than deleting it).
-- Login, accounts, backend, database, digital-page publishing, admin controls, and billing are not yet production-ready.
+- Login, accounts, backend deployment, database provisioning, digital-page publishing, admin controls, and billing are not yet production-ready.
+- Initial D1 account/session/subscription/audit schema is prepared in `database/schema.sql`.
 
 
 ## Admin-Granted Free Subscriptions

@@ -723,6 +723,15 @@ async function googleLogin(request, env, headers) {
 // ==========================================
 
 async function requireDigitalAccess(env, userId) {
+  const account = await env.DB.prepare(
+    "SELECT role FROM users WHERE id = ? LIMIT 1"
+  ).bind(userId).first();
+
+  // Super Admin has full digital-page and image access without a paid plan.
+  if (account?.role === "super_admin") {
+    return { id: "super-admin-access", plan_code: "admin", ends_at: null, source: "admin" };
+  }
+
   const now = new Date().toISOString();
   const subscription = await env.DB.prepare(`
     SELECT id, plan_code, ends_at, source, grant_reason
@@ -902,7 +911,9 @@ async function handleDigitalPages(request, env, headers, url) {
       return reply({ success: false, error: "Invalid JSON body" }, 400, headers);
     }
 
-    const planLimit = subscription.plan_code === "business" ? 5 : 1;
+    const planLimit = subscription.plan_code === "admin"
+      ? Number.POSITIVE_INFINITY
+      : subscription.plan_code === "business" ? 5 : 1;
     const pageCount = await env.DB.prepare(
       "SELECT COUNT(*) AS total FROM digital_pages WHERE user_id = ?"
     ).bind(user.id).first();

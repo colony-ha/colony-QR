@@ -836,6 +836,12 @@ async function handleDigitalPages(request, env, headers, url) {
       WHERE p.slug = ? AND p.status = 'published'
         AND EXISTS (
           SELECT 1
+          FROM users u
+          WHERE u.id = p.user_id
+            AND u.status = 'active'
+        )
+        AND EXISTS (
+          SELECT 1
           FROM subscriptions s
           WHERE s.user_id = p.user_id
             AND s.status = 'active'
@@ -1717,6 +1723,113 @@ async function adminChangeUserStatus(
       email: target.email,
       status
     }
+  }, 200, headers);
+}
+
+// ==========================================
+// ADMIN: DELETE USER ACCOUNT
+// ==========================================
+
+async function adminDeleteUser(
+  request,
+  env,
+  headers,
+  userId
+) {
+  const access = await requireSuperAdmin(request, env);
+
+  if (!access.ok) {
+    return reply({
+      success: false,
+      error: access.error
+    }, access.status, headers);
+  }
+
+  const actor = access.user;
+
+  const target = await env.DB.prepare(`
+    SELECT id, email, display_name, role
+    FROM users
+    WHERE id = ?
+    LIMIT 1
+  `).bind(userId).first();
+
+  if (!target) {
+    return reply({
+      success: false,
+      error: "User not found"
+    }, 404, headers);
+  }
+
+  if (
+    isSuperAdminEmail(target.email) ||
+    target.role === "super_admin"
+  ) {
+    return reply({
+      success: false,
+      error: "Super Admin accounts are protected"
+    }, 403, headers);
+  }
+
+  if (target.id === actor.id) {
+    return reply({
+      success: false,
+      error: "You cannot delete your own account"
+    }, 403, headers);
+  }
+
+  const now = new Date().toISOString();
+
+  await env.DB.batch([
+    env.DB.prepare(`
+      DELETE FROM digital_page_items
+      WHERE page_id IN (
+        SELECT id FROM digital_pages WHERE user_id = ?
+      )
+    `).bind(userId),
+    env.DB.prepare(`
+      DELETE FROM digital_pages WHERE user_id = ?
+    `).bind(userId),
+    env.DB.prepare(`
+      DELETE FROM qr_codes WHERE user_id = ?
+    `).bind(userId),
+    env.DB.prepare(`
+      DELETE FROM subscriptions WHERE user_id = ?
+    `).bind(userId),
+    env.DB.prepare(`
+      DELETE FROM subscription_extension_requests WHERE user_id = ?
+    `).bind(userId),
+    env.DB.prepare(`
+      DELETE FROM sessions WHERE user_id = ?
+    `).bind(userId),
+    env.DB.prepare(`
+      DELETE FROM audit_logs
+      WHERE actor_user_id = ? OR target_user_id = ?
+    `).bind(userId, userId),
+    env.DB.prepare(`
+      DELETE FROM users WHERE id = ?
+    `).bind(userId),
+    env.DB.prepare(`
+      INSERT INTO audit_logs (
+        id, actor_user_id, target_user_id,
+        action, details_json, created_at
+      )
+      VALUES (?, ?, NULL, 'user_deleted', ?, ?)
+    `).bind(
+      crypto.randomUUID(),
+      actor.id,
+      JSON.stringify({
+        email: target.email,
+        display_name: target.display_name,
+        deleted_user_id: target.id
+      }),
+      now
+    )
+  ]);
+
+  return reply({
+    success: true,
+    message: "User account and related database records deleted"
   }, 200, headers);
 }
 
@@ -3020,6 +3133,22 @@ export default {
         request.method === "GET"
       ) {
         return await adminUsers(request, env, headers, url);
+      }
+
+      const adminDeleteMatch = url.pathname.match(
+        /^\\/api\\/admin\\/users\\/([a-f0-9-]{36})$/i
+      );
+
+      if (
+        adminDeleteMatch &&
+        request.method === "DELETE"
+      ) {
+        return await adminDeleteUser(
+          request,
+          env,
+          headers,
+          adminDeleteMatch[1]
+        );
       }
 
       const adminStatusMatch = url.pathname.match(

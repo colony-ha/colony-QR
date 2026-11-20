@@ -3295,6 +3295,52 @@ export default {
       }
 
       // --------------------------------------
+      // UPDATE PROFILE DISPLAY NAME
+      // --------------------------------------
+
+      if (
+        url.pathname === "/api/auth/profile" &&
+        request.method === "PUT"
+      ) {
+        const user = await currentUser(request, env);
+
+        if (!user) {
+          return reply({ success: false, error: "Authentication required" }, 401, headers);
+        }
+
+        const body = await readJson(request);
+        if (!body) {
+          return reply({ success: false, error: "Invalid JSON body" }, 400, headers);
+        }
+
+        const displayName = String(body.display_name || "").trim().replace(/\\s+/g, " ");
+        if (displayName.length < 2 || displayName.length > 40) {
+          return reply({ success: false, error: "Name must be 2 to 40 characters" }, 400, headers);
+        }
+
+        const existing = await env.DB.prepare(`
+          SELECT id FROM users
+          WHERE lower(trim(display_name)) = lower(trim(?))
+            AND id <> ?
+          LIMIT 1
+        `).bind(displayName, user.id).first();
+
+        if (existing) {
+          return reply({ success: false, error: "Username already taken. Please choose another." }, 409, headers);
+        }
+
+        await env.DB.prepare(
+          "UPDATE users SET display_name = ? WHERE id = ?"
+        ).bind(displayName, user.id).run();
+
+        return reply({
+          success: true,
+          message: "Profile name updated",
+          user: { id: user.id, email: user.email, display_name: displayName, role: user.role }
+        }, 200, headers);
+      }
+
+      // --------------------------------------
       // CURRENT ACCOUNT
       // --------------------------------------
 

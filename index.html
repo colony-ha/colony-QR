@@ -35,9 +35,9 @@ function payload(){
  if(currentType==='phone'){const n=val('phone').replace(/[^0-9+]/g,'');return n?'tel:'+n:''}
  if(currentType==='email'){const to=val('email'),subject=encodeURIComponent(val('subject')),body=encodeURIComponent(val('body'));return to?'mailto:'+to+'?subject='+subject+'&body='+body:''}
  if(currentType==='sms'){const n=val('phone').replace(/[^0-9+]/g,'');return n?'sms:'+n+(val('message')?'?body='+encodeURIComponent(val('message')):''):''}
- if(currentType==='contact'){const esc=s=>s.replace(/\\/g,'\\\\').replace(/;/g,'\\;').replace(/,/g,'\\,').replace(/\n/g,'\\n');const name=esc(val('name')),phone=esc(val('phone')),email=esc(val('email')),org=esc(val('company'));return name?'BEGIN:VCARD\nVERSION:3.0\nFN:'+name+'\n'+(phone?'TEL;TYPE=CELL:'+phone+'\n':'')+(email?'EMAIL:'+email+'\n':'')+(org?'ORG:'+org+'\n':'')+'END:VCARD':''}
+ if(currentType==='contact'){const esc=s=>s.replace(/\\/g,'\\\\').replace(/;/g,'\\;').replace(/,/g,'\\,').replace(/\n/g,'\\n');const name=esc(val('name')),phone=esc(val('phone')),email=esc(val('email')),org=esc(val('company'));return name?['BEGIN:VCARD','VERSION:3.0','FN:'+name,...(phone?['TEL;TYPE=CELL:'+phone]:[]),...(email?['EMAIL:'+email]:[]),...(org?['ORG:'+org]:[]),'END:VCARD'].join(String.fromCharCode(10)):''}
  if(currentType==='location'){const lat=val('lat'),lng=val('lng');return lat&&lng?'geo:'+lat+','+lng:''}
- if(currentType==='event'){const title=val('eventTitle'),start=val('eventStart').replace(/[-:]/g,'')+'00',end=val('eventEnd').replace(/[-:]/g,'')+'00';return title&&val('eventStart')&&val('eventEnd')?'BEGIN:VEVENT\nSUMMARY:'+title+'\nDTSTART:'+start+'\nDTEND:'+end+'\nLOCATION:'+val('eventPlace')+'\nEND:VEVENT':''}
+ if(currentType==='event'){const title=val('eventTitle'),start=val('eventStart').replace(/[-:]/g,'')+'00',end=val('eventEnd').replace(/[-:]/g,'')+'00';return title&&val('eventStart')&&val('eventEnd')?['BEGIN:VEVENT','SUMMARY:'+title,'DTSTART:'+start,'DTEND:'+end,'LOCATION:'+val('eventPlace'),'END:VEVENT'].join(String.fromCharCode(10)):''}
  if(currentType==='social'){return val('socialUrl')}
  return val('content');
 }

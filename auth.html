@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#151515">
+<title>Account access — COLONY QR</title>
+<style>
+:root{--bg:#151515;--panel:#202020;--gold:#c8a45d;--ivory:#f5f1e8;--muted:#aaa69d;--line:rgba(245,241,232,.13);--blue:#a9ddf5}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(circle at 80% 10%,#26333a 0,transparent 34%),var(--bg);color:var(--ivory);font:15px Arial,sans-serif;display:grid;place-items:center;padding:24px}
+a{color:var(--gold);text-decoration:none}.card{width:min(100%,460px);background:rgba(32,32,32,.96);border:1px solid var(--line);border-radius:20px;padding:30px;box-shadow:0 24px 80px #0008}
+.brand{font-weight:800;letter-spacing:1.4px;font-size:19px;margin-bottom:28px}.brand span{color:var(--gold)}h1{font-size:27px;margin:0 0 8px}.sub{color:var(--muted);line-height:1.6;margin:0 0 24px}
+.tabs{display:flex;gap:8px;background:#171717;padding:5px;border-radius:11px;margin-bottom:22px}.tabs button{flex:1;border:0;background:transparent;color:#bbb;padding:11px;border-radius:8px;cursor:pointer;font-weight:700}.tabs button.active{background:var(--gold);color:#171511}
+label{display:block;font-size:13px;margin:15px 0 7px;color:#ddd}input{width:100%;padding:13px 14px;border-radius:9px;border:1px solid var(--line);background:#151515;color:var(--ivory);font:inherit;outline:none}input:focus{border-color:var(--gold)}
+.primary{width:100%;border:0;border-radius:9px;padding:14px;margin-top:22px;background:var(--gold);color:#171511;font-weight:800;font-size:15px;cursor:pointer}.primary:disabled{opacity:.6;cursor:wait}
+.message{display:none;margin-top:16px;padding:12px;border-radius:9px;line-height:1.5;font-size:13px}.message.error{display:block;background:#482727;color:#ffdada}.message.ok{display:block;background:#203d31;color:#d7ffe9}
+.foot{margin-top:22px;text-align:center;color:var(--muted);font-size:13px}.lang{float:right;background:#171717;color:var(--ivory);border:1px solid var(--line);padding:7px;border-radius:8px}
+[dir=rtl] body{font-family:Arial,sans-serif}[dir=rtl] label{text-align:right}
+</style>
+</head>
+<body>
+<main class="card">
+<select class="lang" id="lang" aria-label="Language"><option value="en">EN</option><option value="fr">FR</option><option value="ar">عربي</option></select>
+<div class="brand">COLONY <span>QR</span></div>
+<h1 id="heading">Welcome back</h1>
+<p class="sub" id="subtitle">Sign in to manage your COLONY QR account.</p>
+<div class="tabs"><button type="button" id="loginTab" class="active">Log in</button><button type="button" id="registerTab">Create account</button></div>
+<form id="authForm">
+<div id="nameWrap" hidden><label for="displayName" id="nameLabel">Full name</label><input id="displayName" name="display_name" autocomplete="name" maxlength="80"></div>
+<label for="email" id="emailLabel">Email address</label>
+<input id="email" name="email" type="email" autocomplete="email" required maxlength="254">
+<label for="password" id="passwordLabel">Password</label>
+<input id="password" name="password" type="password" autocomplete="current-password" required minlength="12" maxlength="128">
+<button class="primary" id="submit" type="submit">Log in</button>
+</form>
+<div class="message" id="message" role="status" aria-live="polite"></div>
+<div class="foot"><a href="index.html" id="back">Back to COLONY QR</a></div>
+</main>
+<script>
+const API="https://colony-qr-api.colonyus666.workers.dev";
+const $=id=>document.getElementById(id);
+let mode="login",language="en";
+const words={
+en:{headingLogin:"Welcome back",headingRegister:"Create your account",subLogin:"Sign in to manage your COLONY QR account.",subRegister:"Create an account to get started with COLONY QR.",login:"Log in",register:"Create account",name:"Full name",email:"Email address",password:"Password",submitLogin:"Log in",submitRegister:"Create account",back:"Back to COLONY QR",needName:"Please enter your name.",generic:"Something went wrong. Please try again.",network:"Could not connect to the server. Please try again.",created:"Account created. Your session may require browser cookie support.",logged:"Login successful.",invalid:"Invalid email or password.",passwordHint:"Use at least 12 characters."},
+fr:{headingLogin:"Bon retour",headingRegister:"Créer votre compte",subLogin:"Connectez-vous pour gérer votre compte COLONY QR.",subRegister:"Créez un compte pour commencer avec COLONY QR.",login:"Connexion",register:"Créer un compte",name:"Nom complet",email:"Adresse e-mail",password:"Mot de passe",submitLogin:"Se connecter",submitRegister:"Créer un compte",back:"Retour à COLONY QR",needName:"Veuillez saisir votre nom.",generic:"Une erreur est survenue. Réessayez.",network:"Connexion au serveur impossible. Réessayez.",created:"Compte créé. La session peut nécessiter l’autorisation des cookies.",logged:"Connexion réussie.",invalid:"E-mail ou mot de passe invalide.",passwordHint:"Utilisez au moins 12 caractères."},
+ar:{headingLogin:"مرحباً بعودتك",headingRegister:"إنشاء حساب جديد",subLogin:"سجّل الدخول لإدارة حسابك في COLONY QR.",subRegister:"أنشئ حسابك وابدأ استخدام COLONY QR.",login:"تسجيل الدخول",register:"إنشاء حساب",name:"الاسم الكامل",email:"البريد الإلكتروني",password:"كلمة المرور",submitLogin:"تسجيل الدخول",submitRegister:"إنشاء حساب",back:"العودة إلى COLONY QR",needName:"يرجى إدخال اسمك.",generic:"حدث خطأ. حاول مرة أخرى.",network:"تعذر الاتصال بالخادم. حاول مجدداً.",created:"تم إنشاء الحساب. قد تحتاج الجلسة إلى السماح بملفات تعريف الارتباط.",logged:"تم تسجيل الدخول بنجاح.",invalid:"البريد الإلكتروني أو كلمة المرور غير صحيحة.",passwordHint:"استعمل 12 حرفاً على الأقل."}
+};
+function showMessage(text,type){const box=$("message");box.textContent=text;box.className="message "+type}
+function render(){
+ const t=words[language];document.documentElement.lang=language;document.documentElement.dir=language==="ar"?"rtl":"ltr";
+ $("heading").textContent=mode==="login"?t.headingLogin:t.headingRegister;
+ $("subtitle").textContent=mode==="login"?t.subLogin:t.subRegister;
+ $("loginTab").textContent=t.login;$("registerTab").textContent=t.register;
+ $("loginTab").classList.toggle("active",mode==="login");$("registerTab").classList.toggle("active",mode==="register");
+ $("nameWrap").hidden=mode!=="register";$("displayName").required=mode==="register";
+ $("nameLabel").textContent=t.name;$("emailLabel").textContent=t.email;$("passwordLabel").textContent=t.password;
+ $("submit").textContent=mode==="login"?t.submitLogin:t.submitRegister;
+ $("password").autocomplete=mode==="login"?"current-password":"new-password";
+ $("back").textContent=t.back;
+}
+$("loginTab").onclick=()=>{mode="login";$("message").className="message";render()};
+$("registerTab").onclick=()=>{mode="register";$("message").className="message";render()};
+$("lang").onchange=e=>{language=e.target.value;render()};
+$("authForm").onsubmit=async e=>{
+ e.preventDefault();const t=words[language],button=$("submit");button.disabled=true;$("message").className="message";
+ const payload={email:$("email").value.trim(),password:$("password").value};
+ if(mode==="register"){payload.display_name=$("displayName").value.trim();if(payload.display_name.length<2){showMessage(t.needName,"error");button.disabled=false;return}}
+ if(payload.password.length<12){showMessage(t.passwordHint,"error");button.disabled=false;return}
+ try{
+  const response=await fetch(API+(mode==="login"?"/api/auth/login":"/api/auth/register"),{method:"POST",headers:{"Content-Type":"application/json"},credentials:"include",body:JSON.stringify(payload)});
+  const data=await response.json();
+  if(!response.ok){showMessage(data.error==="Invalid email or password"?t.invalid:(data.error||t.generic),"error")}
+  else{showMessage(mode==="login"?t.logged:t.created,"ok");if(mode==="register"){mode="login";render()}}
+ }catch(err){showMessage(t.network,"error")}
+ finally{button.disabled=false}
+};
+render();
+</script>
+</body>
+</html>

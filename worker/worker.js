@@ -1841,7 +1841,13 @@ async function userExtensionRequests(request, env, headers) {
       ORDER BY created_at DESC
       LIMIT 20
     `).bind(user.id).all();
-    return reply({ success: true, requests: result.results || [] }, 200, headers);
+    const activeSubscription = await requireDigitalAccess(env, user.id);
+    return reply({
+      success: true,
+      has_access: Boolean(activeSubscription),
+      subscription_ends_at: activeSubscription?.ends_at || null,
+      requests: result.results || []
+    }, 200, headers);
   }
 
   if (request.method !== "POST") return reply({ success: false, error: "Method not allowed" }, 405, headers);

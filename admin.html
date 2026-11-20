@@ -50,7 +50,7 @@
 <div class="tablewrap"><table><thead><tr><th data-i18n="account">الحساب</th><th data-i18n="days">الأيام المطلوبة</th><th data-i18n="requestMessage">رسالة المستخدم</th><th data-i18n="status">الحالة</th><th data-i18n="created">تاريخ الطلب</th><th data-i18n="actions">الإجراءات</th></tr></thead><tbody id="requestsBody"><tr><td colspan="6" class="state">—</td></tr></tbody></table></div>
 </section>
 <section id="paymentsSection" class="panel hidden">
-<div class="panelhead"><h2 data-i18n="paymentSettings">إعدادات الدفع</h2><button class="btn gold" id="savePaymentSettings" data-i18n="saveSettings">حفظ الإعدادات</button></div>
+<div class="panelhead"><h2 data-i18n="paymentSettings">إعدادات الدفع</h2><button type="button" class="btn gold" id="savePaymentSettings" data-i18n="saveSettings" onclick="savePaymentSettings()">حفظ الإعدادات</button></div>
 <p class="muted small" data-i18n="paymentRateHint">Pro = 2 USD وBusiness = 5 USD شهرياً. أدخل سعر صرف الدولار.</p>
 <div class="search"><input id="rateDzd" type="number" min="0.0001" step="0.01" placeholder="1 USD = DZD"><input id="rateEur" type="number" min="0.0001" step="0.0001" placeholder="1 USD = EUR"></div>
 <div class="search"><input id="ccpHolder" placeholder="CCP account holder"><input id="ccpNumber" placeholder="CCP account number"></div>

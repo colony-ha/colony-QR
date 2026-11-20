@@ -52,6 +52,7 @@
 <div class="footer" data-i18n="footer">تُسجّل الإجراءات الإدارية في سجل التدقيق.</div>
 </main>
 <div id="modal" class="modal hidden"><div class="modalbox"><div class="panelhead"><h3 id="modalTitle"></h3><button class="btn" id="modalClose">✕</button></div><div id="modalContent"></div><div class="modalactions" id="modalActions"></div></div></div>
+<script src="https://unpkg.com/qr-code-styling@1.9.2/lib/qr-code-styling.js"></script>
 <script>
 const API="https://colony-qr-api.colonyus666.workers.dev",$=id=>document.getElementById(id);
 const dict={
@@ -78,7 +79,37 @@ async function subscriptionAction(id,action){const key=action==="pause"?"confirm
 async function changePlan(id){const plan=prompt(t("planPrompt"),"pro");if(!plan)return;const p=plan.trim().toLowerCase();if(!["free","pro","business"].includes(p)){alert("Use free, pro or business");return;}try{await api("/api/admin/subscriptions/"+encodeURIComponent(id),{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"change_plan",plan_code:p})});showMessage(t("operationDone"),"ok");await loadSubs();}catch(e){showMessage(e.message||t("actionFailed"));}}
 function openModal(title,content){$("modalTitle").textContent=title;$("modalContent").innerHTML=content;$("modalActions").innerHTML='<button class="btn gold" id="modalDone">'+t("close")+'</button>';$("modal").classList.remove("hidden");$("modalDone").onclick=closeModal;}
 function closeModal(){$("modal").classList.add("hidden");}
-function viewQr(q){if(!q)return;let design=q.design_json||"{}";try{design=JSON.stringify(JSON.parse(design),null,2)}catch{}openModal(t("details")+" — "+(q.title||"QR"),'<p><b>'+t("account")+':</b> '+esc(q.user_email)+'</p><p><b>'+t("qrTitle")+':</b> '+esc(q.title)+'</p><p><b>'+t("type")+':</b> '+esc(q.qr_type)+'</p><p><b>'+t("qrContent")+':</b></p><pre class="details">'+esc(q.content||"")+'</pre><p><b>'+t("design")+':</b></p><pre class="details">'+esc(design)+'</pre>');}
+function viewQr(q){
+if(!q)return;
+const previewId="adminQrPreview";
+openModal(t("details")+" — "+(q.title||"QR"),
+'<div style="display:flex;flex-direction:column;align-items:center;gap:14px;padding:8px 0 18px">'+
+'<div id="'+previewId+'" style="width:240px;height:240px;background:#fff;border-radius:12px;padding:10px;display:flex;align-items:center;justify-content:center"></div>'+
+'<div style="text-align:center"><strong style="font-size:17px">'+esc(q.title||"QR")+'</strong>'+
+'<div class="muted small">'+esc(q.qr_type||"QR")+'</div></div></div>'+
+'<p><b>'+t("account")+':</b> '+esc(q.user_email)+'</p>'+
+'<p><b>'+t("qrTitle")+':</b> '+esc(q.title)+'</p>'+
+'<p><b>'+t("type")+':</b> '+esc(q.qr_type)+'</p>'+
+'<p><b>'+t("qrContent")+':</b></p><pre class="details">'+esc(q.content||"")+'</pre>');
+const host=$(previewId);
+if(!host)return;
+let design={};
+try{design=typeof q.design_json==="string"?JSON.parse(q.design_json||"{}"):(q.design_json||{});}catch(e){}
+if(!window.QRCodeStyling){host.textContent=lang==="ar"?"تعذر تحميل عارض رمز QR":"QR preview could not be loaded";return;}
+try{
+const instance=new QRCodeStyling({
+width:220,height:220,type:"canvas",data:String(q.content||""),margin:4,
+qrOptions:{errorCorrectionLevel:design.error||"H"},
+dotsOptions:{color:design.fg||"#151515",type:design.dots||"rounded"},
+backgroundOptions:{color:design.bg||"#ffffff"},
+cornersSquareOptions:{color:design.fg||"#151515",type:design.corners||"extra-rounded"},
+cornersDotOptions:{color:design.fg||"#151515",type:"dot"},
+image:design.logoDataUrl||undefined,
+imageOptions:{hideBackgroundDots:true,imageSize:0.22,crossOrigin:"anonymous",margin:5}
+});
+instance.append(host);
+}catch(e){host.textContent=lang==="ar"?"تعذر إنشاء معاينة رمز QR":"Could not render QR preview";}
+}
 function switchTab(tab){document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("active",b.dataset.tab===tab));$("usersSection").classList.toggle("hidden",tab!=="users");$("subscriptionsSection").classList.toggle("hidden",tab!=="subscriptions");$("qrsSection").classList.toggle("hidden",tab!=="qrs");if(tab==="subscriptions")loadSubs().catch(e=>showMessage(e.message||t("failed")));if(tab==="qrs")loadQrs().catch(e=>showMessage(e.message||t("failed")));}
 document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>switchTab(b.dataset.tab));
 $("language").onchange=e=>{lang=e.target.value;localStorage.setItem("colony_qr_language",lang);setLang();if(currentUser)refreshAll();};

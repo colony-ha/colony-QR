@@ -132,7 +132,7 @@ function corsHeaders(origin) {
     headers["Access-Control-Allow-Origin"] = ALLOWED_ORIGIN;
     headers["Access-Control-Allow-Credentials"] = "true";
     headers["Access-Control-Allow-Methods"] =
-      "GET, POST, PATCH, DELETE, OPTIONS";
+      "GET, POST, PUT, PATCH, DELETE, OPTIONS";
     headers["Access-Control-Allow-Headers"] =
       "Content-Type";
   }

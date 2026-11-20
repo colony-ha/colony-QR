@@ -1940,10 +1940,10 @@ async function adminReviewExtensionRequest(request, env, headers, requestId) {
         SELECT ?, ?, 'pro', 'admin_granted', 'active', ?, ?, 0, NULL, NULL, ?, ?, ?, ?
         WHERE EXISTS (
           SELECT 1 FROM subscription_extension_requests
-          WHERE id = ? AND status = 'approved' AND reviewed_by = ?
+          WHERE id = ? AND status = 'approved' AND reviewed_by = ? AND reviewed_at = ?
         )
       `).bind(subscriptionId, row.user_id, now, endsAt, access.user.id,
-        "Approved free extension request", now, now, requestId, access.user.id)
+        "Approved free extension request", now, now, requestId, access.user.id, now)
     ]);
     await writeAudit(env, access.user.id, row.user_id, "digital_page_extension_approved", {
       request_id: requestId, subscription_id: subscriptionId, duration_days: row.requested_days, admin_note: adminNote

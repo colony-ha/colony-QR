@@ -3313,7 +3313,7 @@ export default {
           return reply({ success: false, error: "Invalid JSON body" }, 400, headers);
         }
 
-        const displayName = String(body.display_name || "").trim().replace(/\\s+/g, " ");
+        const displayName = String(body.display_name || "").trim().replace(/\s+/g, " ");
         if (displayName.length < 2 || displayName.length > 40) {
           return reply({ success: false, error: "Name must be 2 to 40 characters" }, 400, headers);
         }

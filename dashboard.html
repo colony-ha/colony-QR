@@ -52,7 +52,19 @@
 <a href="#settings" data-section="settings"><span class="qicon">⚙</span><b data-i18n="accountDetails">Account details</b><small data-i18n="accountDetailsDesc">Review your profile and sign-in details.</small></a>
  <a href="digital-pages.html"><span class="qicon">▣</span><b data-i18n="digitalPages">Digital Pages</b><small data-i18n="digitalPagesDesc">Create and manage your digital business page.</small></a>
 </div></div>
-<div class="panel"><h2 data-i18n="gettingStarted">Getting started</h2><p class="desc" data-i18n="gettingDesc">Your COLONY QR workspace is ready.</p><div class="notice" data-i18n="notice">You can create and download QR codes now. Saving codes to your account, scan analytics and digital pages will be added in upcoming steps.</div><p style="margin-top:22px"><a class="primary" href="generator.html" data-i18n="openGenerator">Open QR generator →</a></p></div>
+<div class="panel"><h2 data-i18n="gettingStarted">Getting started</h2><p class="desc" data-i18n="gettingDesc">Your COLONY QR workspace is ready.</p><div class="notice" data-i18n="notice">You can create and download QR codes now. Saving codes to your account, scan analytics and digital pages will be added in upcoming steps.</div>
+<div id="extensionBox" class="notice" style="display:none;margin-top:16px">
+<strong id="extensionTitle">طلب تمديد التجربة المجانية</strong>
+<p id="extensionInfo" style="margin:8px 0"></p>
+<div id="extensionForm" style="display:none;gap:10px;flex-direction:column">
+<label for="extensionDays">عدد الأيام المطلوبة (1 إلى 30)</label>
+<input id="extensionDays" type="number" min="1" max="30" value="7" style="max-width:180px;padding:10px;border-radius:8px;border:1px solid #bbb">
+<label for="extensionMessage">رسالتك للمدير (اختياري)</label>
+<textarea id="extensionMessage" rows="3" maxlength="1000" style="width:100%;padding:10px;border-radius:8px;border:1px solid #bbb"></textarea>
+<button class="primary" id="sendExtensionRequest" type="button">إرسال طلب التمديد</button>
+</div>
+<div id="extensionHistory" style="margin-top:10px"></div>
+</div><p style="margin-top:22px"><a class="primary" href="generator.html" data-i18n="openGenerator">Open QR generator →</a></p></div>
 </div>
 </section>
 <section class="section" id="codes"><div class="welcome"><div><div class="eyebrow">COLONY QR</div><h1 data-i18n="myCodes">My QR Codes</h1><p data-i18n="codesIntro">Your saved QR codes will be organized here.</p></div><a class="primary" href="generator.html" data-i18n="createNew">Create new QR</a></div><div class="panel"><div id="qrListState" class="qr-loading">Loading your QR codes…</div><div id="qrList" class="qr-list"></div></div></section>
@@ -77,9 +89,34 @@ function safeText(value){return String(value??"").replace(/[&<>"']/g,ch=>({"&":"
 function qrDate(value){if(!value)return "";const d=new Date(value);return Number.isNaN(d.getTime())?"":d.toLocaleDateString(lang==="ar"?"ar":lang==="fr"?"fr":"en",{year:"numeric",month:"short",day:"numeric"});}
 async function loadQrCodes(force=false){if(qrLoaded&&!force)return;const state=$("qrListState"),list=$("qrList");state.style.display="block";state.className="qr-loading";state.textContent=translations[lang].loadingCodes;list.innerHTML="";try{const r=await fetch(API+"/api/qr",{credentials:"include",cache:"no-store"});if(r.status===401){location.replace("auth.html");return;}const data=await r.json();if(!r.ok||!data.success)throw new Error("load");const rows=data.qr_codes||data.codes||data.items||data.data||[];const codes=Array.isArray(rows)?rows:[];$("totalQrCount").textContent=String(codes.length);state.style.display=codes.length?"none":"block";if(!codes.length){state.className="qr-empty";state.innerHTML="<strong>"+safeText(translations[lang].noCodes)+"</strong><span>"+safeText(translations[lang].noCodesDesc)+"</span><p><a class='primary' href='generator.html'>＋ "+safeText(translations[lang].openGeneratorText)+"</a></p>";}else{list.innerHTML=codes.map(q=>{const id=safeText(q.id),title=safeText(q.title||"Untitled QR"),type=safeText(q.qr_type||"QR").toUpperCase(),content=safeText(q.content||""),date=safeText(q.created_at?qrDate(q.created_at):"");return "<article class='qr-card'><div class='qr-preview' data-qr-preview='"+id+"' aria-label='QR code preview'></div><div class='qr-info'><strong>"+title+"</strong><small>"+type+(date?" · "+date:"")+"</small><small>"+content+"</small></div><div class='qr-actions'><button class='download' type='button' data-download-qr='"+id+"'>"+safeText(translations[lang].downloadCode)+"</button><button class='delete' type='button' data-delete-qr='"+id+"'>"+safeText(translations[lang].deleteCode)+"</button></div></article>";}).join("");codes.forEach(q=>{const host=list.querySelector("[data-qr-preview='"+CSS.escape(String(q.id))+"']");if(!host||!window.QRCodeStyling)return;let design={};try{design=typeof q.design_json==="string"?JSON.parse(q.design_json||"{}"):(q.design_json||{});}catch(e){}const instance=new QRCodeStyling({width:220,height:220,type:"canvas",data:String(q.content||""),margin:4,qrOptions:{errorCorrectionLevel:design.error||"H"},dotsOptions:{color:design.fg||"#151515",type:design.dots||"rounded"},backgroundOptions:{color:design.bg||"#ffffff"},cornersSquareOptions:{color:design.fg||"#151515",type:design.corners||"extra-rounded"},cornersDotOptions:{color:design.fg||"#151515",type:"dot"},image:design.logoDataUrl||undefined,imageOptions:{hideBackgroundDots:true,imageSize:0.22,crossOrigin:"anonymous",margin:5}});instance.append(host);host._qrInstance=instance;});list.querySelectorAll("[data-download-qr]").forEach(btn=>btn.addEventListener("click",()=>{const host=list.querySelector("[data-qr-preview='"+CSS.escape(btn.dataset.downloadQr)+"']");if(host?._qrInstance)host._qrInstance.download({name:"colony-qr",extension:"png"});}));list.querySelectorAll("[data-delete-qr]").forEach(btn=>btn.addEventListener("click",()=>deleteQr(btn.dataset.deleteQr,btn)));}qrLoaded=true;}catch(e){state.style.display="block";state.className="qr-error";state.textContent=translations[lang].codesLoadFailed;}}
 async function deleteQr(id,button){if(!confirm(translations[lang].deleteConfirm))return;button.disabled=true;try{const r=await fetch(API+"/api/qr/"+encodeURIComponent(id),{method:"DELETE",credentials:"include"});const data=await r.json();if(!r.ok||!data.success)throw new Error("delete");qrLoaded=false;await loadQrCodes(true);}catch(e){alert(translations[lang].deleteFailed);button.disabled=false;}}
+async function loadExtensionStatus(){
+ const box=$("extensionBox");if(!box)return;
+ try{
+  const r=await fetch(API+"/api/digital-page-extension-requests",{credentials:"include",cache:"no-store"});
+  if(!r.ok)return;const d=await r.json();if(!d.success)return;
+  if(d.has_access){box.style.display="none";return;}
+  box.style.display="block";
+  const form=$("extensionForm"),info=$("extensionInfo"),history=$("extensionHistory");
+  const rows=d.requests||[],pending=rows.find(x=>x.status==="pending");
+  form.style.display=pending?"none":"flex";
+  info.textContent=pending?"لديك طلب تمديد قيد المراجعة. يمكنك متابعة حالته هنا.":"انتهت صلاحية التجربة أو لا يوجد اشتراك نشط. يمكنك طلب تمديد مجاني من المدير.";
+  history.innerHTML=rows.slice(0,3).map(x=>"<div style='padding:8px 0;border-top:1px solid rgba(120,120,120,.25)'><b>"+safeText(x.status==="pending"?"قيد الانتظار":x.status==="approved"?"تمت الموافقة":"مرفوض")+"</b> · "+safeText(x.requested_days)+" أيام"+(x.admin_note?"<div>"+safeText(x.admin_note)+"</div>":"")+"</div>").join("");
+ }catch(e){}
+}
+async function sendExtensionRequest(){
+ const button=$("sendExtensionRequest"),days=Number($("extensionDays").value),message=$("extensionMessage").value.trim();
+ if(!Number.isInteger(days)||days<1||days>30){alert("اختر عدداً من 1 إلى 30 يوماً");return;}
+ button.disabled=true;
+ try{
+  const r=await fetch(API+"/api/digital-page-extension-requests",{method:"POST",credentials:"include",headers:{"Content-Type":"application/json"},body:JSON.stringify({requested_days:days,message})});
+  const d=await r.json();if(!r.ok||!d.success)throw new Error(d.error||"تعذر إرسال الطلب");
+  $("extensionInfo").textContent="تم إرسال طلبك بنجاح، وهو الآن قيد المراجعة.";
+  $("extensionForm").style.display="none";await loadExtensionStatus();
+ }catch(e){alert(e.message||"تعذر إرسال الطلب");}finally{button.disabled=false;}
+}
 function fillAccount(user){account=user;const adminLink=$("adminNavLink");if(adminLink)adminLink.style.display=user.role==="super_admin"?"flex":"none";const name=user.display_name||"COLONY QR User",email=user.email||"";$("welcomeName").textContent=name;$("sideName").textContent=name;$("sideEmail").textContent=email;$("avatar").textContent=(name.trim()[0]||"C").toUpperCase();$("profileName").textContent=name;$("profileEmail").textContent=email;$("profileRole").textContent=user.role||"user";}
-async function loadAccount(){try{const r=await fetch(API+"/api/auth/me",{credentials:"include",cache:"no-store"});if(!r.ok){location.replace("auth.html");return}const data=await r.json();if(!data.success||!data.user){location.replace("auth.html");return}fillAccount(data.user);const section=location.hash.slice(1);if(["codes","analytics","settings"].includes(section))showSection(section);}catch(e){alert(translations[lang].loadError);location.replace("auth.html");}}
-$("logout").addEventListener("click",async()=>{const b=$("logout");b.disabled=true;try{await fetch(API+"/api/auth/logout",{method:"POST",credentials:"include"});}finally{location.replace("auth.html");}});
+async function loadAccount(){try{const r=await fetch(API+"/api/auth/me",{credentials:"include",cache:"no-store"});if(!r.ok){location.replace("auth.html");return}const data=await r.json();if(!data.success||!data.user){location.replace("auth.html");return}fillAccount(data.user);loadExtensionStatus();const section=location.hash.slice(1);if(["codes","analytics","settings"].includes(section))showSection(section);}catch(e){alert(translations[lang].loadError);location.replace("auth.html");}}
+$("sendExtensionRequest")?.addEventListener("click",sendExtensionRequest);\n$("logout").addEventListener("click",async()=>{const b=$("logout");b.disabled=true;try{await fetch(API+"/api/auth/logout",{method:"POST",credentials:"include"});}finally{location.replace("auth.html");}});
 $("language").value=lang;applyLanguage();loadAccount();
 </script>
 </body>

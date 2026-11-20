@@ -60,3 +60,20 @@ COLONY QR is a multilingual QR platform for a global audience.
 - Existing QR generator prototype is in `index.html`.
 - Existing QR generator must be preserved when the public landing page is introduced (move it to a dedicated generator page rather than deleting it).
 - Login, accounts, backend, database, digital-page publishing, admin controls, and billing are not yet production-ready.
+
+
+## Admin-Granted Free Subscriptions
+
+The Super Admin can grant a user a subscription entitlement without collecting payment. This is separate from paid billing and must be clearly labeled.
+
+- Subscription source/type: `paid` or `admin_granted`.
+- The Super Admin can grant Free, Pro, or Business plan access to a selected account.
+- Admin-granted access can have a chosen duration (for example 1 month, 6 months, 1 year) or no fixed expiry.
+- The Super Admin can change or revoke an admin-granted entitlement.
+- The user workspace and public page access must follow the granted plan limits and entitlement status.
+- Keep an audit log recording who granted, changed, or revoked access, which account and plan were affected, the duration, timestamp, and optional reason.
+- Admin-granted access must never create a payment charge or pretend that a payment occurred.
+- The account owner should be able to see that the plan was granted by the platform administrator.
+- Enforce all grants, expirations, and revocations on the server side; hiding or showing UI controls alone is not authorization.
+
+This capability is an administrative entitlement feature, not a payment gateway feature.

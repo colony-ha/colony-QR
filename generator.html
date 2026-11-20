@@ -13,6 +13,49 @@
 :root{--ink:#151515;--gold:#c8a45d;--ivory:#f5f1e8;--blue:#a9ddf5;--muted:#777;--line:#e9e5dc;--white:#fff}
 *{box-sizing:border-box}body{margin:0;background:var(--ivory);color:var(--ink);font-family:'DM Sans',sans-serif}button,input,select,textarea{font:inherit}button{cursor:pointer}.top{height:76px;background:rgba(245,241,232,.94);border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 max(5vw,22px);position:sticky;top:0;z-index:5;backdrop-filter:blur(14px)}.brand{display:flex;align-items:center;gap:11px;font:800 20px Manrope,sans-serif;letter-spacing:-.8px}.mark{width:35px;height:35px;border-radius:11px;background:var(--ink);display:grid;place-items:center;color:var(--gold);font-size:19px}.brand span{color:var(--gold)}.topright{display:flex;gap:12px;align-items:center}.lang{border:1px solid var(--line);background:transparent;padding:9px 12px;border-radius:9px}.login{border:0;background:var(--ink);color:white;border-radius:9px;padding:11px 18px;font-weight:700}.wrap{max-width:1200px;margin:auto;padding:42px 22px 70px}.intro{text-align:center;margin:10px auto 32px;max-width:720px}.eyebrow{color:#98763c;text-transform:uppercase;letter-spacing:2px;font-size:11px;font-weight:800}.intro h1{font:800 clamp(32px,5vw,52px)/1.08 Manrope,sans-serif;letter-spacing:-2px;margin:12px 0}.intro h1 em{font-style:normal;color:#a88343}.intro p{color:#68645d;line-height:1.7;margin:0}.workspace{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(300px,.85fr);gap:22px;align-items:start}.panel{background:white;border:1px solid #eae6dd;border-radius:18px;padding:24px;box-shadow:0 12px 40px #29200d0a}.panel h2{font:800 18px Manrope;margin:0 0 18px}.types{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-bottom:23px}.type{border:1px solid var(--line);background:#fff;border-radius:11px;padding:12px 5px;color:#57534d;font-size:12px;font-weight:700}.type b{display:block;font-size:20px;margin-bottom:5px}.type.active{border-color:var(--gold);background:#fbf7ed;color:#755923;box-shadow:inset 0 0 0 1px var(--gold)}.field{margin:0 0 17px}.field label{display:block;font-size:12px;font-weight:800;margin-bottom:8px}.field input,.field textarea,.field select{width:100%;border:1px solid #e4e0d8;border-radius:10px;padding:13px 14px;background:#fff;outline:none}.field input:focus,.field textarea:focus,.field select:focus{border-color:#a9cfe2;box-shadow:0 0 0 3px #a9ddf533}.field textarea{min-height:86px;resize:vertical}.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}.divider{height:1px;background:var(--line);margin:22px 0}.colors{display:flex;gap:13px;align-items:center}.colorpick{display:flex;align-items:center;gap:7px;font-size:12px;color:#625e56}.colorpick input{width:34px;height:34px;padding:2px;border:1px solid var(--line);border-radius:8px;background:white}.actions{display:flex;gap:10px;margin-top:20px}.primary{background:var(--ink);color:#fff;border:0;border-radius:10px;padding:13px 18px;font-weight:800;flex:1}.secondary{background:white;border:1px solid var(--line);border-radius:10px;padding:13px 16px;font-weight:700}.preview{position:sticky;top:96px;text-align:center}.previewbox{background:#fbfaf7;border:1px dashed #d9d1c2;border-radius:15px;padding:26px 15px;margin:0 auto 18px;display:grid;place-items:center;min-height:280px}.qrstage{background:white;border-radius:16px;padding:16px;box-shadow:0 8px 30px #0000000b;display:inline-grid;place-items:center;max-width:100%;overflow:hidden}.qrstage #qr{position:relative}.qrstage #qr canvas,.qrstage #qr img{display:block}.qrstage img,.qrstage canvas{max-width:100%;height:auto}.preview h3{font:800 17px Manrope;margin:0 0 7px}.preview p{font-size:12px;color:#777;line-height:1.6;margin:0}.shape-note{font-size:11px;color:#8b744c;background:#faf5e8;padding:10px;border-radius:9px;margin-top:14px;line-height:1.5}.notice{font-size:11px;color:#777;margin-top:14px;line-height:1.5}.foot{text-align:center;color:#8a857b;font-size:11px;margin-top:35px}.foot strong{color:#aa8749}
 @media(max-width:800px){.workspace{grid-template-columns:1fr}.preview{position:static}.intro h1{letter-spacing:-1px}.top{height:66px}.panel{padding:18px}.types{grid-template-columns:repeat(4,1fr)}}@media(max-width:420px){.types{grid-template-columns:repeat(2,1fr)}.row{grid-template-columns:1fr}.topright{gap:6px}.login{padding:10px 12px}.brand{font-size:17px}}
+
+/* COLONY QR dark luxury theme — visual refresh only; generator logic is unchanged */
+:root{--ink:#f5f1e8;--gold:#c8a45d;--ivory:#151515;--muted:#aaa69d;--line:rgba(245,241,232,.13);--white:#202020}
+html{background:#151515}
+body{background:#151515;color:var(--ink);font-family:'DM Sans',sans-serif}
+.top{background:rgba(21,21,21,.94);border-bottom:1px solid var(--line)}
+.brand{color:#f5f1e8}
+.mark{background:#f5f1e8;color:#151515;border:1px solid var(--gold)}
+.brand span{color:var(--gold)}
+.lang{border:1px solid var(--line);background:#222;color:#f5f1e8}
+.login{background:var(--gold);color:#171511}
+.wrap{padding-top:48px}
+.eyebrow{color:var(--blue)}
+.intro h1{color:#f5f1e8}
+.intro h1 em{color:var(--gold)}
+.intro p{color:#b9b4aa}
+.panel{background:#202020;border:1px solid var(--line);box-shadow:0 16px 48px rgba(0,0,0,.2)}
+.panel h2{color:#f5f1e8}
+.type{border:1px solid rgba(245,241,232,.15);background:#252525;color:#d7d1c6}
+.type:hover{border-color:rgba(200,164,93,.65);background:#2b2924}
+.type.active{border-color:var(--gold);background:rgba(200,164,93,.12);color:#e7c987;box-shadow:inset 0 0 0 1px var(--gold)}
+.field label{color:#eee8dc}
+.field input,.field textarea,.field select{border:1px solid rgba(245,241,232,.16);background:#171717;color:#f5f1e8}
+.field input::placeholder,.field textarea::placeholder{color:#827d74}
+.field input:focus,.field textarea:focus,.field select:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(169,221,245,.12)}
+.field input[type=file]{color:#bdb7ac}
+.divider{background:var(--line)}
+.colorpick{color:#c8c2b7}
+.colorpick input{border:1px solid rgba(245,241,232,.2);background:#292929}
+.primary{background:var(--gold);color:#171511}
+.primary:hover{background:#d8b875}
+.secondary{background:#292929;border:1px solid rgba(245,241,232,.2);color:#f5f1e8}
+.secondary:hover{border-color:var(--gold)}
+.previewbox{background:#171717;border:1px dashed rgba(200,164,93,.4)}
+.qrstage{background:#fff;box-shadow:0 12px 35px rgba(0,0,0,.35)}
+.preview h3{color:#f5f1e8}
+.preview p{color:#aaa69d}
+.shape-note{color:#d8c08d;background:rgba(200,164,93,.1);border:1px solid rgba(200,164,93,.16)}
+.notice{color:#aaa69d}
+.foot{color:#88837a}
+.foot strong{color:var(--gold)}
+@media(max-width:800px){.wrap{padding-top:32px}}
+
 </style></head>
 <body>
 <header class="top"><div class="brand"><div class="mark">⌗</div>COLONY <span>QR</span></div><div class="topright"><select class="lang" id="lang" aria-label="Language"><option value="en">EN</option><option value="fr">FR</option><option value="ar">AR</option></select><button class="login" id="loginBtn">Log in</button></div></header>

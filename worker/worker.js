@@ -2728,6 +2728,190 @@ async function adminUpdateSubscription(
 }
 
 // ==========================================
+// MANUAL SUBSCRIPTION PAYMENTS
+// ==========================================
+
+async function getPaymentSettings(env) {
+  return await env.DB.prepare(`
+    SELECT usd_to_dzd, usd_to_eur,
+      ccp_account_holder, ccp_account_number,
+      cpa_account_holder, cpa_account_number,
+      sepa_account_holder, sepa_iban, sepa_bank_name,
+      updated_at
+    FROM payment_settings WHERE id = 1
+  `).first();
+}
+
+function paymentAmount(planCode, currency, settings) {
+  const usd = planCode === "business" ? 5 : 2;
+  if (currency === "DZD" && Number(settings?.usd_to_dzd) > 0) return { amount: Math.round(usd * Number(settings.usd_to_dzd) * 100) / 100, rate: Number(settings.usd_to_dzd), usd };
+  if (currency === "EUR" && Number(settings?.usd_to_eur) > 0) return { amount: Math.round(usd * Number(settings.usd_to_eur) * 100) / 100, rate: Number(settings.usd_to_eur), usd };
+  return null;
+}
+
+async function userPaymentOptions(request, env, headers) {
+  const user = await currentUser(request, env);
+  if (!user) return reply({ success: false, error: "Authentication required" }, 401, headers);
+  const settings = await getPaymentSettings(env);
+  if (!settings) return reply({ success: false, error: "Payment settings are not configured" }, 503, headers);
+  return reply({
+    success: true,
+    prices: {
+      pro: { usd: 2, DZD: paymentAmount("pro", "DZD", settings)?.amount ?? null, EUR: paymentAmount("pro", "EUR", settings)?.amount ?? null },
+      business: { usd: 5, DZD: paymentAmount("business", "DZD", settings)?.amount ?? null, EUR: paymentAmount("business", "EUR", settings)?.amount ?? null }
+    },
+    methods: {
+      ccp: { account_holder: settings.ccp_account_holder, account_number: settings.ccp_account_number },
+      cpa: { account_holder: settings.cpa_account_holder, account_number: settings.cpa_account_number },
+      sepa: { account_holder: settings.sepa_account_holder, iban: settings.sepa_iban, bank_name: settings.sepa_bank_name }
+    }
+  }, 200, headers);
+}
+
+async function createPaymentRequest(request, env, headers) {
+  const user = await currentUser(request, env);
+  if (!user) return reply({ success: false, error: "Authentication required" }, 401, headers);
+  if (user.status !== "active") return reply({ success: false, error: "Account is not active" }, 403, headers);
+  const form = await request.formData();
+  const planCode = String(form.get("plan_code") || "").toLowerCase();
+  const method = String(form.get("payment_method") || "").toLowerCase();
+  const currency = String(form.get("currency") || "").toUpperCase();
+  const file = form.get("receipt");
+  if (!["pro", "business"].includes(planCode)) return reply({ success: false, error: "Choose Pro or Business" }, 400, headers);
+  if (!["ccp", "cpa", "sepa"].includes(method)) return reply({ success: false, error: "Invalid payment method" }, 400, headers);
+  if (!["DZD", "EUR"].includes(currency) || (method !== "sepa" && currency !== "DZD") || (method === "sepa" && currency !== "EUR")) return reply({ success: false, error: "Currency does not match the selected payment method" }, 400, headers);
+  if (!file || typeof file === "string" || !file.size || file.size > 5 * 1024 * 1024) return reply({ success: false, error: "Upload a receipt image up to 5 MB" }, 400, headers);
+  if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) return reply({ success: false, error: "Receipt must be JPG, PNG, or WebP" }, 400, headers);
+  const pending = await env.DB.prepare("SELECT id FROM payment_requests WHERE user_id = ? AND status = 'pending' LIMIT 1").bind(user.id).first();
+  if (pending) return reply({ success: false, error: "You already have a pending payment request" }, 409, headers);
+  const settings = await getPaymentSettings(env);
+  const price = paymentAmount(planCode, currency, settings);
+  if (!price) return reply({ success: false, error: "The selected currency rate has not been configured by the administrator" }, 409, headers);
+  const methodAccount = method === "ccp" ? settings.ccp_account_number : method === "cpa" ? settings.cpa_account_number : settings.sepa_iban;
+  if (!methodAccount) return reply({ success: false, error: "The selected payment method is not available yet" }, 409, headers);
+  if (!env.IMAGEKIT_PRIVATE_KEY) return reply({ success: false, error: "Receipt storage is not configured" }, 503, headers);
+  const upload = new FormData();
+  upload.append("file", file, file.name || "receipt");
+  upload.append("fileName", "receipt-" + crypto.randomUUID() + "." + (file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg"));
+  upload.append("folder", "/colony-qr/payment-receipts");
+  upload.append("useUniqueFileName", "true");
+  const uploaded = await fetch("https://upload.imagekit.io/api/v1/files/upload", {
+    method: "POST",
+    headers: { Authorization: "Basic " + btoa(env.IMAGEKIT_PRIVATE_KEY + ":") },
+    body: upload
+  });
+  const uploadData = await uploaded.json().catch(() => ({}));
+  if (!uploaded.ok || !uploadData.filePath || !uploadData.fileId) {
+    console.error("ImageKit receipt upload failed", uploadData);
+    return reply({ success: false, error: "Could not upload receipt. Please try again." }, 502, headers);
+  }
+  const id = crypto.randomUUID();
+  const now = new Date().toISOString();
+  await env.DB.prepare(`
+    INSERT INTO payment_requests (
+      id, user_id, plan_code, payment_method, amount, currency,
+      amount_usd, exchange_rate, receipt_file_path, receipt_file_id,
+      status, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
+  `).bind(id, user.id, planCode, method, price.amount, currency, price.usd, price.rate, uploadData.filePath, uploadData.fileId, now, now).run();
+  return reply({ success: true, request: { id, plan_code: planCode, payment_method: method, amount: price.amount, currency, status: "pending", created_at: now } }, 201, headers);
+}
+
+async function userPaymentRequests(request, env, headers) {
+  const user = await currentUser(request, env);
+  if (!user) return reply({ success: false, error: "Authentication required" }, 401, headers);
+  const result = await env.DB.prepare(`
+    SELECT id, plan_code, payment_method, amount, currency, status, admin_note, created_at, reviewed_at
+    FROM payment_requests WHERE user_id = ? ORDER BY created_at DESC LIMIT 30
+  `).bind(user.id).all();
+  return reply({ success: true, requests: result.results || [] }, 200, headers);
+}
+
+async function adminPaymentSettings(request, env, headers) {
+  const access = await requireSuperAdmin(request, env);
+  if (!access.ok) return reply({ success: false, error: access.error }, access.status, headers);
+  if (request.method === "GET") return reply({ success: true, settings: await getPaymentSettings(env) }, 200, headers);
+  if (request.method !== "PUT") return reply({ success: false, error: "Method not allowed" }, 405, headers);
+  const body = await readJson(request);
+  if (!body) return reply({ success: false, error: "Invalid JSON body" }, 400, headers);
+  const dzd = Number(body.usd_to_dzd), eur = Number(body.usd_to_eur);
+  if (!Number.isFinite(dzd) || dzd <= 0 || dzd > 100000 || !Number.isFinite(eur) || eur <= 0 || eur > 10000) return reply({ success: false, error: "Enter valid USD exchange rates" }, 400, headers);
+  const clean = value => String(value || "").trim().slice(0, 200);
+  const now = new Date().toISOString();
+  await env.DB.prepare(`
+    UPDATE payment_settings SET usd_to_dzd = ?, usd_to_eur = ?,
+      ccp_account_holder = ?, ccp_account_number = ?,
+      cpa_account_holder = ?, cpa_account_number = ?,
+      sepa_account_holder = ?, sepa_iban = ?, sepa_bank_name = ?,
+      updated_at = ? WHERE id = 1
+  `).bind(dzd, eur, clean(body.ccp_account_holder), clean(body.ccp_account_number), clean(body.cpa_account_holder), clean(body.cpa_account_number), clean(body.sepa_account_holder), clean(body.sepa_iban), clean(body.sepa_bank_name), now).run();
+  await writeAudit(env, access.user.id, null, "payment_settings_updated", { usd_to_dzd: dzd, usd_to_eur: eur });
+  return reply({ success: true, settings: await getPaymentSettings(env) }, 200, headers);
+}
+
+async function adminPaymentRequests(request, env, headers, url) {
+  const access = await requireSuperAdmin(request, env);
+  if (!access.ok) return reply({ success: false, error: access.error }, access.status, headers);
+  const status = String(url.searchParams.get("status") || "").toLowerCase();
+  const where = ["pending", "approved", "rejected"].includes(status) ? "WHERE p.status = ?" : "";
+  const query = `
+    SELECT p.id, p.user_id, p.plan_code, p.payment_method, p.amount, p.currency,
+      p.amount_usd, p.exchange_rate, p.receipt_file_path, p.receipt_file_id,
+      p.status, p.admin_note, p.created_at, p.reviewed_at,
+      u.email AS user_email, u.display_name AS user_name
+    FROM payment_requests p JOIN users u ON u.id = p.user_id
+    ${where} ORDER BY p.created_at DESC LIMIT 200
+  `;
+  const result = where ? await env.DB.prepare(query).bind(status).all() : await env.DB.prepare(query).all();
+  const endpoint = String(env.IMAGEKIT_URL_ENDPOINT || "").replace(/\/$/, "");
+  const requests = (result.results || []).map(row => ({ ...row, receipt_url: endpoint && row.receipt_file_path ? endpoint + row.receipt_file_path : null }));
+  return reply({ success: true, requests }, 200, headers);
+}
+
+async function adminReviewPaymentRequest(request, env, headers, requestId) {
+  const access = await requireSuperAdmin(request, env);
+  if (!access.ok) return reply({ success: false, error: access.error }, access.status, headers);
+  const body = await readJson(request);
+  if (!body) return reply({ success: false, error: "Invalid JSON body" }, 400, headers);
+  const decision = String(body.decision || "").toLowerCase();
+  const note = String(body.admin_note || "").trim().slice(0, 1000);
+  if (!["approved", "rejected"].includes(decision)) return reply({ success: false, error: "Decision must be approved or rejected" }, 400, headers);
+  const row = await env.DB.prepare("SELECT * FROM payment_requests WHERE id = ?").bind(requestId).first();
+  if (!row) return reply({ success: false, error: "Payment request not found" }, 404, headers);
+  if (row.status !== "pending") return reply({ success: false, error: "This request has already been reviewed" }, 409, headers);
+  const now = new Date().toISOString();
+  if (decision === "rejected") {
+    const updated = await env.DB.prepare(`
+      UPDATE payment_requests SET status = 'rejected', admin_note = ?, reviewed_by = ?, reviewed_at = ?, updated_at = ?
+      WHERE id = ? AND status = 'pending'
+    `).bind(note, access.user.id, now, now, requestId).run();
+    if (!updated.meta?.changes) return reply({ success: false, error: "This request has already been reviewed" }, 409, headers);
+    await writeAudit(env, access.user.id, row.user_id, "payment_request_rejected", { payment_request_id: requestId, admin_note: note });
+    return reply({ success: true, status: "rejected" }, 200, headers);
+  }
+  const target = await findAdminTarget(env, row.user_id);
+  if (!target || target.status !== "active") return reply({ success: false, error: "The customer's account is not active" }, 409, headers);
+  const start = new Date(), end = new Date(start);
+  end.setUTCMonth(end.getUTCMonth() + 1);
+  const startsAt = start.toISOString(), endsAt = end.toISOString(), subscriptionId = crypto.randomUUID();
+  await env.DB.batch([
+    env.DB.prepare("UPDATE subscriptions SET status = 'cancelled', ends_at = ?, auto_renew = 0, updated_at = ? WHERE user_id = ? AND status IN ('active', 'paused')").bind(startsAt, startsAt, row.user_id),
+    env.DB.prepare(`
+      INSERT INTO subscriptions (
+        id, user_id, plan_code, source, status, starts_at, ends_at,
+        auto_renew, provider, provider_subscription_id, granted_by_user_id,
+        grant_reason, created_at, updated_at
+      ) VALUES (?, ?, ?, 'paid', 'active', ?, ?, 0, 'manual', ?, ?, ?, ?, ?)
+    `).bind(subscriptionId, row.user_id, row.plan_code, startsAt, endsAt, requestId, access.user.id, "Manual payment request " + requestId, startsAt, startsAt),
+    env.DB.prepare("UPDATE payment_requests SET status = 'approved', admin_note = ?, reviewed_by = ?, reviewed_at = ?, updated_at = ? WHERE id = ? AND status = 'pending'").bind(note, access.user.id, startsAt, startsAt, requestId)
+  ]);
+  const check = await env.DB.prepare("SELECT status FROM payment_requests WHERE id = ?").bind(requestId).first();
+  if (check?.status !== "approved") return reply({ success: false, error: "Could not approve this request. Refresh and try again." }, 409, headers);
+  await writeAudit(env, access.user.id, row.user_id, "payment_request_approved", { payment_request_id: requestId, subscription_id: subscriptionId, plan_code: row.plan_code, amount: row.amount, currency: row.currency, starts_at: startsAt, ends_at: endsAt });
+  return reply({ success: true, status: "approved", subscription: { id: subscriptionId, plan_code: row.plan_code, starts_at: startsAt, ends_at: endsAt } }, 200, headers);
+}
+
+// ==========================================
 // MAIN API ROUTER
 // ==========================================
 
@@ -3175,6 +3359,18 @@ export default {
       if (extensionReviewMatch && request.method === "POST") {
         return await adminReviewExtensionRequest(request, env, headers, extensionReviewMatch[1]);
       }
+
+      // ======================================
+      // MANUAL SUBSCRIPTION PAYMENTS
+      // ======================================
+
+      if (url.pathname === "/api/payment/options" && request.method === "GET") return await userPaymentOptions(request, env, headers);
+      if (url.pathname === "/api/payment/requests" && request.method === "POST") return await createPaymentRequest(request, env, headers);
+      if (url.pathname === "/api/payment/requests" && request.method === "GET") return await userPaymentRequests(request, env, headers);
+      if (url.pathname === "/api/admin/payment-settings" && ["GET", "PUT"].includes(request.method)) return await adminPaymentSettings(request, env, headers);
+      if (url.pathname === "/api/admin/payment-requests" && request.method === "GET") return await adminPaymentRequests(request, env, headers, url);
+      const paymentReviewMatch = url.pathname.match(/^\/api\/admin\/payment-requests\/([a-f0-9-]{36})\/review$/i);
+      if (paymentReviewMatch && request.method === "POST") return await adminReviewPaymentRequest(request, env, headers, paymentReviewMatch[1]);
 
       // ======================================
       // SUPER ADMIN ROUTES

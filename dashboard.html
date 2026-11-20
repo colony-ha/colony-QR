@@ -116,7 +116,8 @@ async function sendExtensionRequest(){
 }
 function fillAccount(user){account=user;const adminLink=$("adminNavLink");if(adminLink)adminLink.style.display=user.role==="super_admin"?"flex":"none";const name=user.display_name||"COLONY QR User",email=user.email||"";$("welcomeName").textContent=name;$("sideName").textContent=name;$("sideEmail").textContent=email;$("avatar").textContent=(name.trim()[0]||"C").toUpperCase();$("profileName").textContent=name;$("profileEmail").textContent=email;$("profileRole").textContent=user.role||"user";}
 async function loadAccount(){try{const r=await fetch(API+"/api/auth/me",{credentials:"include",cache:"no-store"});if(!r.ok){location.replace("auth.html");return}const data=await r.json();if(!data.success||!data.user){location.replace("auth.html");return}fillAccount(data.user);loadExtensionStatus();const section=location.hash.slice(1);if(["codes","analytics","settings"].includes(section))showSection(section);}catch(e){alert(translations[lang].loadError);location.replace("auth.html");}}
-$("sendExtensionRequest")?.addEventListener("click",sendExtensionRequest);\n$("logout").addEventListener("click",async()=>{const b=$("logout");b.disabled=true;try{await fetch(API+"/api/auth/logout",{method:"POST",credentials:"include"});}finally{location.replace("auth.html");}});
+$("sendExtensionRequest")?.addEventListener("click",sendExtensionRequest);
+$("logout").addEventListener("click",async()=>{const b=$("logout");b.disabled=true;try{await fetch(API+"/api/auth/logout",{method:"POST",credentials:"include"});}finally{location.replace("auth.html");}});
 $("language").value=lang;applyLanguage();loadAccount();
 </script>
 </body>

@@ -13,7 +13,7 @@ a{color:var(--gold);text-decoration:none}.card{width:min(100%,460px);background:
 .tabs{display:flex;gap:8px;background:#171717;padding:5px;border-radius:11px;margin-bottom:22px}.tabs button{flex:1;border:0;background:transparent;color:#bbb;padding:11px;border-radius:8px;cursor:pointer;font-weight:700}.tabs button.active{background:var(--gold);color:#171511}
 label{display:block;font-size:13px;margin:15px 0 7px;color:#ddd}input{width:100%;padding:13px 14px;border-radius:9px;border:1px solid var(--line);background:#151515;color:var(--ivory);font:inherit;outline:none}input:focus{border-color:var(--gold)}
 .primary{width:100%;border:0;border-radius:9px;padding:14px;margin-top:22px;background:var(--gold);color:#171511;font-weight:800;font-size:15px;cursor:pointer}.primary:disabled{opacity:.6;cursor:wait}
-.message{display:none;margin-top:16px;padding:12px;border-radius:9px;line-height:1.5;font-size:13px}.message.error{display:block;background:#482727;color:#ffdada}.message.ok{display:block;background:#203d31;color:#d7ffe9}
+.google-area{margin-top:20px;padding-top:18px;border-top:1px solid var(--line);text-align:center}.google-label{color:var(--muted);font-size:13px;margin:0 0 14px}.google-button{display:flex;justify-content:center;min-height:44px}.google-help{font-size:12px;color:var(--muted);margin-top:10px}.message{display:none;margin-top:16px;padding:12px;border-radius:9px;line-height:1.5;font-size:13px}.message.error{display:block;background:#482727;color:#ffdada}.message.ok{display:block;background:#203d31;color:#d7ffe9}
 .foot{margin-top:22px;text-align:center;color:var(--muted);font-size:13px}.lang{float:right;background:#171717;color:var(--ivory);border:1px solid var(--line);padding:7px;border-radius:8px}
 [dir=rtl] body{font-family:Arial,sans-serif}[dir=rtl] label{text-align:right}
 </style>
@@ -33,17 +33,20 @@ label{display:block;font-size:13px;margin:15px 0 7px;color:#ddd}input{width:100%
 <input id="password" name="password" type="password" autocomplete="current-password" required minlength="12" maxlength="128">
 <button class="primary" id="submit" type="submit">Log in</button>
 </form>
+<div class="google-area"><p class="google-label" id="googleLabel">Or continue with Google</p><div class="google-button" id="googleButton"></div><p class="google-help" id="googleHelp">Google sign-in is being prepared.</p></div>
 <div class="message" id="message" role="status" aria-live="polite"></div>
 <div class="foot"><a href="index.html" id="back">Back to COLONY QR</a></div>
 </main>
 <script>
 const API="https://colony-qr-api.colonyus666.workers.dev";
+// Replace this placeholder with the Client ID from your NEW Google OAuth client.
+const GOOGLE_CLIENT_ID="PASTE_YOUR_NEW_GOOGLE_CLIENT_ID_HERE";
 const $=id=>document.getElementById(id);
 let mode="login",language="en";
 const words={
-en:{headingLogin:"Welcome back",headingRegister:"Create your account",subLogin:"Sign in to manage your COLONY QR account.",subRegister:"Create an account to get started with COLONY QR.",login:"Log in",register:"Create account",name:"Full name",email:"Email address",password:"Password",submitLogin:"Log in",submitRegister:"Create account",back:"Back to COLONY QR",needName:"Please enter your name.",generic:"Something went wrong. Please try again.",network:"Could not connect to the server. Please try again.",created:"Account created. Your session may require browser cookie support.",logged:"Login successful.",invalid:"Invalid email or password.",passwordHint:"Use at least 12 characters."},
-fr:{headingLogin:"Bon retour",headingRegister:"Créer votre compte",subLogin:"Connectez-vous pour gérer votre compte COLONY QR.",subRegister:"Créez un compte pour commencer avec COLONY QR.",login:"Connexion",register:"Créer un compte",name:"Nom complet",email:"Adresse e-mail",password:"Mot de passe",submitLogin:"Se connecter",submitRegister:"Créer un compte",back:"Retour à COLONY QR",needName:"Veuillez saisir votre nom.",generic:"Une erreur est survenue. Réessayez.",network:"Connexion au serveur impossible. Réessayez.",created:"Compte créé. La session peut nécessiter l’autorisation des cookies.",logged:"Connexion réussie.",invalid:"E-mail ou mot de passe invalide.",passwordHint:"Utilisez au moins 12 caractères."},
-ar:{headingLogin:"مرحباً بعودتك",headingRegister:"إنشاء حساب جديد",subLogin:"سجّل الدخول لإدارة حسابك في COLONY QR.",subRegister:"أنشئ حسابك وابدأ استخدام COLONY QR.",login:"تسجيل الدخول",register:"إنشاء حساب",name:"الاسم الكامل",email:"البريد الإلكتروني",password:"كلمة المرور",submitLogin:"تسجيل الدخول",submitRegister:"إنشاء حساب",back:"العودة إلى COLONY QR",needName:"يرجى إدخال اسمك.",generic:"حدث خطأ. حاول مرة أخرى.",network:"تعذر الاتصال بالخادم. حاول مجدداً.",created:"تم إنشاء الحساب. قد تحتاج الجلسة إلى السماح بملفات تعريف الارتباط.",logged:"تم تسجيل الدخول بنجاح.",invalid:"البريد الإلكتروني أو كلمة المرور غير صحيحة.",passwordHint:"استعمل 12 حرفاً على الأقل."}
+en:{headingLogin:"Welcome back",headingRegister:"Create your account",subLogin:"Sign in to manage your COLONY QR account.",subRegister:"Create an account to get started with COLONY QR.",login:"Log in",register:"Create account",name:"Full name",email:"Email address",password:"Password",submitLogin:"Log in",submitRegister:"Create account",back:"Back to COLONY QR",needName:"Please enter your name.",generic:"Something went wrong. Please try again.",network:"Could not connect to the server. Please try again.",created:"Account created. Your session may require browser cookie support.",logged:"Login successful.",invalid:"Invalid email or password.",passwordHint:"Use at least 12 characters.",googleLabel:"Or continue with Google",googleHelp:"Sign in or create an account securely with Google.",googleFailed:"Google sign-in failed. Please try again.",googleConfig:"Google sign-in is not configured yet."},
+fr:{headingLogin:"Bon retour",headingRegister:"Créer votre compte",subLogin:"Connectez-vous pour gérer votre compte COLONY QR.",subRegister:"Créez un compte pour commencer avec COLONY QR.",login:"Connexion",register:"Créer un compte",name:"Nom complet",email:"Adresse e-mail",password:"Mot de passe",submitLogin:"Se connecter",submitRegister:"Créer un compte",back:"Retour à COLONY QR",needName:"Veuillez saisir votre nom.",generic:"Une erreur est survenue. Réessayez.",network:"Connexion au serveur impossible. Réessayez.",created:"Compte créé. La session peut nécessiter l’autorisation des cookies.",logged:"Connexion réussie.",invalid:"E-mail ou mot de passe invalide.",passwordHint:"Utilisez au moins 12 caractères.",googleLabel:"Ou continuer avec Google",googleHelp:"Connectez-vous ou créez un compte avec Google.",googleFailed:"Échec de la connexion Google. Réessayez.",googleConfig:"La connexion Google n’est pas encore configurée."},
+ar:{headingLogin:"مرحباً بعودتك",headingRegister:"إنشاء حساب جديد",subLogin:"سجّل الدخول لإدارة حسابك في COLONY QR.",subRegister:"أنشئ حسابك وابدأ استخدام COLONY QR.",login:"تسجيل الدخول",register:"إنشاء حساب",name:"الاسم الكامل",email:"البريد الإلكتروني",password:"كلمة المرور",submitLogin:"تسجيل الدخول",submitRegister:"إنشاء حساب",back:"العودة إلى COLONY QR",needName:"يرجى إدخال اسمك.",generic:"حدث خطأ. حاول مرة أخرى.",network:"تعذر الاتصال بالخادم. حاول مجدداً.",created:"تم إنشاء الحساب. قد تحتاج الجلسة إلى السماح بملفات تعريف الارتباط.",logged:"تم تسجيل الدخول بنجاح.",invalid:"البريد الإلكتروني أو كلمة المرور غير صحيحة.",passwordHint:"استعمل 12 حرفاً على الأقل.",googleLabel:"أو تابع باستخدام Google",googleHelp:"سجّل الدخول أو أنشئ حساباً بأمان عبر Google.",googleFailed:"فشل تسجيل الدخول عبر Google. حاول مجدداً.",googleConfig:"تسجيل الدخول عبر Google غير مهيأ بعد."}
 };
 function showMessage(text,type){const box=$("message");box.textContent=text;box.className="message "+type}
 function render(){
@@ -57,6 +60,7 @@ function render(){
  $("submit").textContent=mode==="login"?t.submitLogin:t.submitRegister;
  $("password").autocomplete=mode==="login"?"current-password":"new-password";
  $("back").textContent=t.back;
+ $("googleLabel").textContent=t.googleLabel; $("googleHelp").textContent=t.googleHelp;
 }
 $("loginTab").onclick=()=>{mode="login";$("message").className="message";render()};
 $("registerTab").onclick=()=>{mode="register";$("message").className="message";render()};
@@ -74,7 +78,79 @@ $("authForm").onsubmit=async e=>{
  }catch(err){showMessage(t.network,"error")}
  finally{button.disabled=false}
 };
+
+async function handleGoogleCredential(response, nonce) {
+  const t = words[language];
+  try {
+    const result = await fetch(API + "/api/auth/google", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ credential: response.credential, nonce })
+    });
+    const data = await result.json();
+    if (!result.ok) {
+      showMessage(data.error || t.googleFailed, "error");
+      return;
+    }
+    showMessage(t.logged, "ok");
+  } catch (error) {
+    showMessage(t.network, "error");
+  }
+}
+
+async function setupGoogleSignIn() {
+  const t = words[language];
+  if (!GOOGLE_CLIENT_ID || GOOGLE_CLIENT_ID.includes("PASTE_YOUR")) {
+    $("googleHelp").textContent = t.googleConfig;
+    return;
+  }
+
+  try {
+    const nonceResponse = await fetch(API + "/api/auth/google/nonce", {
+      method: "GET",
+      cache: "no-store"
+    });
+    const nonceData = await nonceResponse.json();
+    if (!nonceResponse.ok || !nonceData.nonce) throw new Error("Nonce unavailable");
+
+    window.google.accounts.id.initialize({
+      client_id: GOOGLE_CLIENT_ID,
+      nonce: nonceData.nonce,
+      callback: response => handleGoogleCredential(response, nonceData.nonce),
+      auto_select: false,
+      cancel_on_tap_outside: true
+    });
+
+    window.google.accounts.id.renderButton($("googleButton"), {
+      type: "standard",
+      theme: "outline",
+      size: "large",
+      text: "continue_with",
+      shape: "rectangular",
+      width: 340,
+      logo_alignment: "left"
+    });
+    $("googleHelp").textContent = t.googleHelp;
+  } catch (error) {
+    $("googleHelp").textContent = t.googleFailed;
+  }
+}
+
+function loadGoogleIdentityServices() {
+  const script = document.createElement("script");
+  script.src = "https://accounts.google.com/gsi/client";
+  script.async = true;
+  script.defer = true;
+  script.onload = setupGoogleSignIn;
+  script.onerror = () => {
+    $("googleHelp").textContent = words[language].googleFailed;
+  };
+  document.head.appendChild(script);
+}
+
 render();
+loadGoogleIdentityServices();
 </script>
 </body>
 </html>

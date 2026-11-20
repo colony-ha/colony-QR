@@ -665,6 +665,420 @@ async function googleLogin(request, env, headers) {
 }
 
 // ==========================================
+// IMAGEKIT + DIGITAL BUSINESS PAGES
+// ==========================================
+
+async function requireDigitalAccess(env, userId) {
+  const now = new Date().toISOString();
+  const subscription = await env.DB.prepare(`
+    SELECT id, plan_code, ends_at
+    FROM subscriptions
+    WHERE user_id = ?
+      AND status = 'active'
+      AND plan_code IN ('pro', 'business')
+      AND starts_at <= ?
+      AND (ends_at IS NULL OR ends_at > ?)
+    ORDER BY
+      CASE WHEN plan_code = 'business' THEN 0 ELSE 1 END,
+      ends_at DESC
+    LIMIT 1
+  `).bind(userId, now, now).first();
+
+  return subscription || null;
+}
+
+async function imageKitAuth(request, env, headers) {
+  const user = await currentUser(request, env);
+
+  if (!user) {
+    return reply({ success: false, error: "Authentication required" }, 401, headers);
+  }
+
+  const subscription = await requireDigitalAccess(env, user.id);
+
+  if (!subscription) {
+    return reply({
+      success: false,
+      error: "An active Pro or Business subscription is required",
+      code: "SUBSCRIPTION_REQUIRED"
+    }, 403, headers);
+  }
+
+  if (!env.IMAGEKIT_PRIVATE_KEY || !env.IMAGEKIT_PUBLIC_KEY || !env.IMAGEKIT_URL_ENDPOINT) {
+    return reply({
+      success: false,
+      error: "Image storage is not configured"
+    }, 503, headers);
+  }
+
+  const token = crypto.randomUUID();
+  const expire = Math.floor(Date.now() / 1000) + 10 * 60;
+  const message = token + expire;
+
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(env.IMAGEKIT_PRIVATE_KEY),
+    { name: "HMAC", hash: "SHA-1" },
+    false,
+    ["sign"]
+  );
+
+  const signatureBytes = await crypto.subtle.sign(
+    "HMAC",
+    key,
+    new TextEncoder().encode(message)
+  );
+
+  return reply({
+    success: true,
+    token,
+    expire,
+    signature: hex(new Uint8Array(signatureBytes)),
+    publicKey: env.IMAGEKIT_PUBLIC_KEY,
+    urlEndpoint: env.IMAGEKIT_URL_ENDPOINT
+  }, 200, headers);
+}
+
+function cleanPageInput(body) {
+  const fields = [
+    "title", "business_category", "description", "phone",
+    "whatsapp", "email", "website", "address", "maps_url",
+    "logo_url", "cover_image_url"
+  ];
+  const result = {};
+
+  for (const field of fields) {
+    if (body[field] !== undefined) {
+      result[field] = String(body[field] ?? "").trim().slice(0, field === "description" ? 5000 : 1000);
+    }
+  }
+
+  return result;
+}
+
+function makeSlug(value) {
+  return String(value || "")
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 70);
+}
+
+async function handleDigitalPages(request, env, headers, url) {
+  const path = url.pathname;
+  const now = new Date().toISOString();
+
+  // Public page lookup by its unique slug.
+  const publicMatch = path.match(/^\/api\/public\/digital-pages\/([a-z0-9-]{1,70})$/i);
+  if (publicMatch && request.method === "GET") {
+    const page = await env.DB.prepare(`
+      SELECT id, title, slug, business_category, description, phone,
+             whatsapp, email, website, address, maps_url, logo_url,
+             cover_image_url, theme_json, social_links_json, updated_at
+      FROM digital_pages
+      WHERE slug = ? AND status = 'published'
+      LIMIT 1
+    `).bind(publicMatch[1]).first();
+
+    if (!page) {
+      return reply({ success: false, error: "Page not found" }, 404, headers);
+    }
+
+    const items = await env.DB.prepare(`
+      SELECT id, item_type, category, name, description, price,
+             currency, image_url, sort_order
+      FROM digital_page_items
+      WHERE page_id = ? AND is_active = 1
+      ORDER BY sort_order ASC, created_at ASC
+    `).bind(page.id).all();
+
+    return reply({ success: true, page, items: items.results || [] }, 200, headers);
+  }
+
+  const user = await currentUser(request, env);
+  if (!user) {
+    return reply({ success: false, error: "Authentication required" }, 401, headers);
+  }
+
+  if (path === "/api/digital-pages" && request.method === "GET") {
+    const result = await env.DB.prepare(`
+      SELECT id, title, slug, business_category, description, phone,
+             whatsapp, email, website, address, maps_url, logo_url,
+             cover_image_url, theme_json, social_links_json, status,
+             created_at, updated_at
+      FROM digital_pages
+      WHERE user_id = ?
+      ORDER BY updated_at DESC
+      LIMIT 100
+    `).bind(user.id).all();
+
+    return reply({ success: true, pages: result.results || [] }, 200, headers);
+  }
+
+  if (path === "/api/digital-pages" && request.method === "POST") {
+    const subscription = await requireDigitalAccess(env, user.id);
+    if (!subscription) {
+      return reply({
+        success: false,
+        error: "An active Pro or Business subscription is required",
+        code: "SUBSCRIPTION_REQUIRED"
+      }, 403, headers);
+    }
+
+    const body = await readJson(request);
+    if (!body || typeof body !== "object") {
+      return reply({ success: false, error: "Invalid JSON body" }, 400, headers);
+    }
+
+    const fields = cleanPageInput(body);
+    if (!fields.title || fields.title.length < 2) {
+      return reply({ success: false, error: "Page title must contain at least 2 characters" }, 400, headers);
+    }
+
+    let slug = makeSlug(body.slug || fields.title);
+    if (!slug) slug = "business-" + randomHex(4);
+    const exists = await env.DB.prepare("SELECT id FROM digital_pages WHERE slug = ? LIMIT 1").bind(slug).first();
+    if (exists) slug = slug + "-" + randomHex(3);
+
+    const id = crypto.randomUUID();
+    await env.DB.prepare(`
+      INSERT INTO digital_pages (
+        id, user_id, title, slug, business_category, description, phone,
+        whatsapp, email, website, address, maps_url, logo_url,
+        cover_image_url, theme_json, social_links_json, status,
+        created_at, updated_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?)
+    `).bind(
+      id, user.id, fields.title, slug,
+      fields.business_category || "", fields.description || "",
+      fields.phone || "", fields.whatsapp || "", fields.email || "",
+      fields.website || "", fields.address || "", fields.maps_url || "",
+      fields.logo_url || "", fields.cover_image_url || "",
+      JSON.stringify(body.theme && typeof body.theme === "object" ? body.theme : {}),
+      JSON.stringify(body.social_links && typeof body.social_links === "object" ? body.social_links : {}),
+      now, now
+    ).run();
+
+    return reply({
+      success: true,
+      message: "Digital page created as draft",
+      page: { id, user_id: user.id, title: fields.title, slug, status: "draft", created_at: now, updated_at: now }
+    }, 201, headers);
+  }
+
+  const pageMatch = path.match(/^\/api\/digital-pages\/([a-f0-9-]{36})$/i);
+  if (pageMatch) {
+    const pageId = pageMatch[1];
+    const page = await env.DB.prepare(`
+      SELECT * FROM digital_pages WHERE id = ? AND user_id = ? LIMIT 1
+    `).bind(pageId, user.id).first();
+
+    if (!page) {
+      return reply({ success: false, error: "Page not found" }, 404, headers);
+    }
+
+    if (request.method === "GET") {
+      const items = await env.DB.prepare(`
+        SELECT * FROM digital_page_items
+        WHERE page_id = ?
+        ORDER BY sort_order ASC, created_at ASC
+      `).bind(pageId).all();
+
+      return reply({ success: true, page, items: items.results || [] }, 200, headers);
+    }
+
+    if (request.method === "PATCH") {
+      const subscription = await requireDigitalAccess(env, user.id);
+      if (!subscription) {
+        return reply({
+          success: false,
+          error: "An active Pro or Business subscription is required",
+          code: "SUBSCRIPTION_REQUIRED"
+        }, 403, headers);
+      }
+
+      const body = await readJson(request);
+      if (!body || typeof body !== "object") {
+        return reply({ success: false, error: "Invalid JSON body" }, 400, headers);
+      }
+
+      const fields = cleanPageInput(body);
+      const allowed = ["title", "business_category", "description", "phone", "whatsapp", "email", "website", "address", "maps_url", "logo_url", "cover_image_url"];
+      const sets = [];
+      const values = [];
+
+      for (const field of allowed) {
+        if (fields[field] !== undefined) {
+          sets.push(field + " = ?");
+          values.push(fields[field]);
+        }
+      }
+
+      if (body.theme !== undefined) {
+        sets.push("theme_json = ?");
+        values.push(JSON.stringify(body.theme && typeof body.theme === "object" ? body.theme : {}));
+      }
+
+      if (body.social_links !== undefined) {
+        sets.push("social_links_json = ?");
+        values.push(JSON.stringify(body.social_links && typeof body.social_links === "object" ? body.social_links : {}));
+      }
+
+      if (body.status !== undefined) {
+        const status = String(body.status);
+        if (!["draft", "published"].includes(status)) {
+          return reply({ success: false, error: "Status must be draft or published" }, 400, headers);
+        }
+        sets.push("status = ?");
+        values.push(status);
+      }
+
+      if (body.slug !== undefined) {
+        const slug = makeSlug(body.slug);
+        if (!slug) return reply({ success: false, error: "Invalid page URL" }, 400, headers);
+        const duplicate = await env.DB.prepare("SELECT id FROM digital_pages WHERE slug = ? AND id <> ? LIMIT 1").bind(slug, pageId).first();
+        if (duplicate) return reply({ success: false, error: "This page URL is already used" }, 409, headers);
+        sets.push("slug = ?");
+        values.push(slug);
+      }
+
+      if (!sets.length) {
+        return reply({ success: false, error: "No changes supplied" }, 400, headers);
+      }
+
+      sets.push("updated_at = ?");
+      values.push(now, pageId, user.id);
+
+      await env.DB.prepare(`
+        UPDATE digital_pages SET ${sets.join(", ")}
+        WHERE id = ? AND user_id = ?
+      `).bind(...values).run();
+
+      const updated = await env.DB.prepare("SELECT * FROM digital_pages WHERE id = ? AND user_id = ?").bind(pageId, user.id).first();
+      return reply({ success: true, page: updated }, 200, headers);
+    }
+
+    if (request.method === "DELETE") {
+      await env.DB.prepare("DELETE FROM digital_pages WHERE id = ? AND user_id = ?").bind(pageId, user.id).run();
+      return reply({ success: true, message: "Digital page deleted" }, 200, headers);
+    }
+  }
+
+  const itemsCollection = path.match(/^\/api\/digital-pages\/([a-f0-9-]{36})\/items$/i);
+  if (itemsCollection) {
+    const pageId = itemsCollection[1];
+    const ownedPage = await env.DB.prepare("SELECT id FROM digital_pages WHERE id = ? AND user_id = ?").bind(pageId, user.id).first();
+    if (!ownedPage) return reply({ success: false, error: "Page not found" }, 404, headers);
+
+    if (request.method === "GET") {
+      const items = await env.DB.prepare("SELECT * FROM digital_page_items WHERE page_id = ? ORDER BY sort_order ASC, created_at ASC").bind(pageId).all();
+      return reply({ success: true, items: items.results || [] }, 200, headers);
+    }
+
+    if (request.method === "POST") {
+      const subscription = await requireDigitalAccess(env, user.id);
+      if (!subscription) return reply({ success: false, error: "An active Pro or Business subscription is required", code: "SUBSCRIPTION_REQUIRED" }, 403, headers);
+
+      const body = await readJson(request);
+      if (!body) return reply({ success: false, error: "Invalid JSON body" }, 400, headers);
+
+      const name = String(body.name || "").trim().slice(0, 160);
+      const itemType = String(body.item_type || "product");
+      if (!name || !["product", "service"].includes(itemType)) {
+        return reply({ success: false, error: "A name and valid item_type (product or service) are required" }, 400, headers);
+      }
+
+      const price = Number(body.price || 0);
+      if (!Number.isFinite(price) || price < 0 || price > 100000000000) {
+        return reply({ success: false, error: "Invalid price" }, 400, headers);
+      }
+
+      const id = crypto.randomUUID();
+      await env.DB.prepare(`
+        INSERT INTO digital_page_items (
+          id, page_id, item_type, category, name, description, price,
+          currency, image_url, sort_order, is_active, created_at, updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+      `).bind(
+        id, pageId, itemType,
+        String(body.category || "").slice(0, 100),
+        name,
+        String(body.description || "").slice(0, 2000),
+        price,
+        String(body.currency || "DZD").slice(0, 8),
+        String(body.image_url || "").slice(0, 2000),
+        Number.isInteger(body.sort_order) ? body.sort_order : 0,
+        now, now
+      ).run();
+
+      return reply({ success: true, item: { id, page_id: pageId, item_type: itemType, name, price } }, 201, headers);
+    }
+  }
+
+  const itemMatch = path.match(/^\/api\/digital-page-items\/([a-f0-9-]{36})$/i);
+  if (itemMatch) {
+    const itemId = itemMatch[1];
+    const item = await env.DB.prepare(`
+      SELECT i.* FROM digital_page_items i
+      JOIN digital_pages p ON p.id = i.page_id
+      WHERE i.id = ? AND p.user_id = ?
+      LIMIT 1
+    `).bind(itemId, user.id).first();
+
+    if (!item) return reply({ success: false, error: "Item not found" }, 404, headers);
+
+    if (request.method === "PATCH") {
+      const subscription = await requireDigitalAccess(env, user.id);
+      if (!subscription) return reply({ success: false, error: "An active Pro or Business subscription is required", code: "SUBSCRIPTION_REQUIRED" }, 403, headers);
+
+      const body = await readJson(request);
+      if (!body) return reply({ success: false, error: "Invalid JSON body" }, 400, headers);
+
+      const allowed = ["item_type", "category", "name", "description", "price", "currency", "image_url", "sort_order", "is_active"];
+      const sets = [];
+      const values = [];
+
+      for (const field of allowed) {
+        if (body[field] === undefined) continue;
+        let value = body[field];
+        if (field === "item_type" && !["product", "service"].includes(String(value))) {
+          return reply({ success: false, error: "Invalid item type" }, 400, headers);
+        }
+        if (field === "price") {
+          value = Number(value);
+          if (!Number.isFinite(value) || value < 0 || value > 100000000000) return reply({ success: false, error: "Invalid price" }, 400, headers);
+        }
+        if (field === "is_active") value = value ? 1 : 0;
+        if (["category", "name", "description", "currency", "image_url"].includes(field)) {
+          value = String(value ?? "").slice(0, field === "description" ? 2000 : 2000);
+        }
+        sets.push(field + " = ?");
+        values.push(value);
+      }
+
+      if (!sets.length) return reply({ success: false, error: "No changes supplied" }, 400, headers);
+      sets.push("updated_at = ?");
+      values.push(now, itemId);
+      await env.DB.prepare(`UPDATE digital_page_items SET ${sets.join(", ")} WHERE id = ?`).bind(...values).run();
+      const updated = await env.DB.prepare("SELECT * FROM digital_page_items WHERE id = ?").bind(itemId).first();
+      return reply({ success: true, item: updated }, 200, headers);
+    }
+
+    if (request.method === "DELETE") {
+      await env.DB.prepare("DELETE FROM digital_page_items WHERE id = ?").bind(itemId).run();
+      return reply({ success: true, message: "Item deleted" }, 200, headers);
+    }
+  }
+
+  return reply({ success: false, error: "Route not found" }, 404, headers);
+}
+
+// ==========================================
 // QR CODE FUNCTIONS
 // ==========================================
 
@@ -2469,6 +2883,29 @@ export default {
           headers,
           subscriptionMatch[1]
         );
+      }
+
+      // --------------------------------------
+      // IMAGEKIT UPLOAD AUTHENTICATION
+      // --------------------------------------
+
+      if (
+        url.pathname === "/api/imagekit/auth" &&
+        request.method === "GET"
+      ) {
+        return await imageKitAuth(request, env, headers);
+      }
+
+      // --------------------------------------
+      // DIGITAL BUSINESS PAGES
+      // --------------------------------------
+
+      if (
+        url.pathname.startsWith("/api/digital-pages") ||
+        url.pathname.startsWith("/api/digital-page-items") ||
+        url.pathname.startsWith("/api/public/digital-pages")
+      ) {
+        return await handleDigitalPages(request, env, headers, url);
       }
 
       // ======================================

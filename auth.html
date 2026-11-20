@@ -127,9 +127,9 @@ async function setupGoogleSignIn() {
       type: "standard",
       theme: "outline",
       size: "large",
-      text: "continue_with",
+      text: "signin_with",
       shape: "rectangular",
-      width: 340,
+      width: Math.min(340, document.querySelector(".card").clientWidth - 60),
       logo_alignment: "left"
     });
     $("googleHelp").textContent = t.googleHelp;

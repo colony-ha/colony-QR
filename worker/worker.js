@@ -2894,19 +2894,23 @@ async function adminReviewPaymentRequest(request, env, headers, requestId) {
   const start = new Date(), end = new Date(start);
   end.setUTCMonth(end.getUTCMonth() + 1);
   const startsAt = start.toISOString(), endsAt = end.toISOString(), subscriptionId = crypto.randomUUID();
-  await env.DB.batch([
-    env.DB.prepare("UPDATE subscriptions SET status = 'cancelled', ends_at = ?, auto_renew = 0, updated_at = ? WHERE user_id = ? AND status IN ('active', 'paused')").bind(startsAt, startsAt, row.user_id),
+  const batchResults = await env.DB.batch([
+    env.DB.prepare("UPDATE payment_requests SET status = 'approved', admin_note = ?, reviewed_by = ?, reviewed_at = ?, updated_at = ? WHERE id = ? AND status = 'pending'").bind(note, access.user.id, startsAt, startsAt, requestId),
+    env.DB.prepare("UPDATE subscriptions SET status = 'cancelled', ends_at = ?, auto_renew = 0, updated_at = ? WHERE user_id = ? AND status IN ('active', 'paused') AND EXISTS (SELECT 1 FROM payment_requests WHERE id = ? AND status = 'approved' AND reviewed_at = ? AND reviewed_by = ?)").bind(startsAt, startsAt, row.user_id, requestId, startsAt, access.user.id),
     env.DB.prepare(`
       INSERT INTO subscriptions (
         id, user_id, plan_code, source, status, starts_at, ends_at,
         auto_renew, provider, provider_subscription_id, granted_by_user_id,
         grant_reason, created_at, updated_at
-      ) VALUES (?, ?, ?, 'paid', 'active', ?, ?, 0, 'manual', ?, ?, ?, ?, ?)
-    `).bind(subscriptionId, row.user_id, row.plan_code, startsAt, endsAt, requestId, access.user.id, "Manual payment request " + requestId, startsAt, startsAt),
-    env.DB.prepare("UPDATE payment_requests SET status = 'approved', admin_note = ?, reviewed_by = ?, reviewed_at = ?, updated_at = ? WHERE id = ? AND status = 'pending'").bind(note, access.user.id, startsAt, startsAt, requestId)
+      )
+      SELECT ?, p.user_id, p.plan_code, 'paid', 'active', ?, ?, 0, 'manual', ?, ?, ?, ?, ?
+      FROM payment_requests p
+      WHERE p.id = ? AND p.status = 'approved' AND p.reviewed_at = ? AND p.reviewed_by = ?
+    `).bind(subscriptionId, startsAt, endsAt, requestId, access.user.id, "Manual payment request " + requestId, startsAt, startsAt, requestId, startsAt, access.user.id)
   ]);
-  const check = await env.DB.prepare("SELECT status FROM payment_requests WHERE id = ?").bind(requestId).first();
-  if (check?.status !== "approved") return reply({ success: false, error: "Could not approve this request. Refresh and try again." }, 409, headers);
+  if (!batchResults?.[0]?.meta?.changes || !batchResults?.[2]?.meta?.changes) {
+    return reply({ success: false, error: "This request has already been reviewed or could not be approved." }, 409, headers);
+  }
   await writeAudit(env, access.user.id, row.user_id, "payment_request_approved", { payment_request_id: requestId, subscription_id: subscriptionId, plan_code: row.plan_code, amount: row.amount, currency: row.currency, starts_at: startsAt, ends_at: endsAt });
   return reply({ success: true, status: "approved", subscription: { id: subscriptionId, plan_code: row.plan_code, starts_at: startsAt, ends_at: endsAt } }, 200, headers);
 }

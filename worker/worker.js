@@ -1,5 +1,5 @@
 const ALLOWED_ORIGIN = "https://colony-qr.pages.dev";
-const SESSION_DAYS = 7;
+const SESSION_DAYS = 30;
 const PASSWORD_ITERATIONS = 100000;
 const GOOGLE_KEYS_URL = "https://www.googleapis.com/oauth2/v3/certs";
 
@@ -161,7 +161,7 @@ function getCookie(request, name) {
 }
 
 function sessionCookie(token, maxAge) {
-  return `colony_session=${token}; HttpOnly; Secure; SameSite=None; Path=/; Max-Age=${maxAge}`;
+  return `colony_session=${token}; HttpOnly; Secure; SameSite=None; Partitioned; Path=/; Max-Age=${maxAge}`;
 }
 
 async function readJson(request) {

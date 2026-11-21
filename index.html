@@ -55,6 +55,29 @@ footer{padding:28px 0;border-top:1px solid var(--line);color:#827d74;font-size:1
 [dir=rtl] body{font-family:Cairo,"DM Sans",sans-serif}[dir=rtl] h1,[dir=rtl] .section h2{letter-spacing:0}[dir=rtl] .navlinks{direction:rtl}[dir=rtl] .hero-grid{direction:rtl}[dir=rtl] .eyebrow:before{display:none}[dir=rtl] .eyebrow:after{content:"";width:22px;height:1px;background:var(--blue)}
 @media(max-width:850px){.navlinks{display:none}.hero-grid{grid-template-columns:1fr;gap:20px}.hero{padding:65px 0 50px}.visual{min-height:370px}.feature-grid,.pricing-grid{grid-template-columns:1fr 1fr}.categories{grid-template-columns:1fr 1fr}}
 @media(max-width:560px){.wrap{width:min(100% - 24px,1160px)}header{height:70px}.nav{gap:8px}.brand{font-size:15px;gap:7px;flex-shrink:0}.brand-logo{width:155px;max-height:45px}.brand-mark{width:31px;height:31px}.navright{display:flex;align-items:center;gap:7px;flex-shrink:0}.login{display:inline-flex!important;visibility:visible;opacity:1;align-items:center;justify-content:center;gap:5px;font-size:12px;white-space:nowrap;padding:9px 10px;border:1px solid rgba(200,164,93,.65);border-radius:8px;color:var(--ivory);min-height:36px}.login:before{content:"↪";font-size:15px;color:var(--gold)}.navright .btn{display:none}.lang{padding:8px 6px;font-size:12px}.hero{padding-top:52px}h1{font-size:43px;letter-spacing:-1.8px}.hero-copy{font-size:15px}.visual{min-height:340px}.orb{width:290px;height:290px}.qr-card{width:220px;padding:21px}.tag-one{right:-2px;top:30px}.tag-two{left:-3px;bottom:35px}.feature-grid,.pricing-grid{grid-template-columns:1fr}.categories{grid-template-columns:1fr 1fr}.category{padding:14px 10px;font-size:12px}.section{padding:62px 0}.footer-inner{flex-direction:column;text-align:center}}
+
+/* COLONY QR — lively premium motion */
+body{background-image:linear-gradient(rgba(255,255,255,.012) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.012) 1px,transparent 1px),radial-gradient(ellipse at 12% 18%,rgba(28,113,190,.13),transparent 34%),radial-gradient(ellipse at 88% 55%,rgba(35,150,80,.10),transparent 32%);background-size:42px 42px,42px 42px,auto,auto}
+header{background:rgba(9,9,9,.82);box-shadow:0 8px 35px rgba(0,0,0,.18)}
+.brand-logo{filter:drop-shadow(0 0 12px rgba(200,164,93,.13));transition:filter .3s,transform .3s}.brand:hover .brand-logo{filter:drop-shadow(0 0 18px rgba(200,164,93,.35));transform:scale(1.025)}
+.hero{isolation:isolate}.hero:after{content:"";position:absolute;width:440px;height:440px;border-radius:50%;left:-220px;bottom:-280px;background:radial-gradient(circle,rgba(85,200,120,.12),transparent 68%);z-index:-1;pointer-events:none}
+.orb{animation:orbBreath 7s ease-in-out infinite;border-color:rgba(200,164,93,.28);box-shadow:0 0 100px rgba(200,164,93,.09),inset 0 0 90px rgba(88,170,255,.055)}
+.qr-card{animation:cardFloat 6s ease-in-out infinite;transform-origin:center;transition:box-shadow .35s}.qr-card:hover{box-shadow:0 35px 100px rgba(25,115,190,.2)}
+.float-tag{animation:tagFloat 5s ease-in-out infinite}.tag-two{animation-delay:-2.5s}
+.eyebrow{color:#8bcaff}.eyebrow:before{background:linear-gradient(90deg,var(--blue),var(--green));height:2px}
+h1 span{background:linear-gradient(100deg,#f3d58c 0%,#c8a45d 48%,#e8c77d 75%,#6caeff 120%);background-size:180% auto;-webkit-background-clip:text;background-clip:text;color:transparent;animation:goldFlow 7s linear infinite}
+.feature,.category,.price-card{position:relative;overflow:hidden}.feature:before,.category:before,.price-card:before{content:"";position:absolute;inset:0;opacity:0;background:linear-gradient(120deg,transparent 20%,rgba(88,170,255,.08),rgba(85,200,120,.07),transparent 80%);transform:translateX(-100%);transition:transform .65s,opacity .3s;pointer-events:none}.feature:hover:before,.category:hover:before,.price-card:hover:before{opacity:1;transform:translateX(100%)}
+.feature{box-shadow:0 8px 30px rgba(0,0,0,.12)}.feature-icon{background:linear-gradient(135deg,rgba(200,164,93,.18),rgba(88,170,255,.11),rgba(85,200,120,.08));border:1px solid rgba(200,164,93,.12)}
+.category{background:linear-gradient(145deg,rgba(31,34,35,.96),rgba(16,17,17,.98))}.category span{filter:drop-shadow(0 0 8px rgba(88,170,255,.2))}
+.btn{transition:transform .25s,box-shadow .25s,filter .25s}.btn-gold{box-shadow:0 8px 25px rgba(200,164,93,.12)}.btn-gold:hover{box-shadow:0 12px 32px rgba(200,164,93,.25)}
+.section-head{position:relative}.section-head:after{content:"";display:block;width:54px;height:2px;margin:22px auto 0;border-radius:2px;background:linear-gradient(90deg,var(--blue),var(--green),var(--gold))}
+.contact-trigger,.start-option,.price-card{transition:transform .25s,border-color .25s,box-shadow .25s}.price-card:hover{transform:translateY(-5px);border-color:rgba(88,170,255,.35);box-shadow:0 18px 45px rgba(0,0,0,.2)}
+@keyframes cardFloat{0%,100%{transform:translateY(0) rotate(-5deg)}50%{transform:translateY(-13px) rotate(-3deg)}}
+@keyframes tagFloat{0%,100%{translate:0 0}50%{translate:0 -9px}}
+@keyframes orbBreath{0%,100%{scale:1;opacity:.85}50%{scale:1.045;opacity:1}}
+@keyframes goldFlow{to{background-position:180% center}}
+@media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;scroll-behavior:auto!important;transition:none!important}}
+@media(max-width:560px){.qr-card{animation-duration:8s}.orb{animation-duration:10s}}
 </style>
 </head>
 <body>

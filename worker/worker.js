@@ -1,4 +1,7 @@
-const ALLOWED_ORIGIN = "https://colony-qr.pages.dev";
+const ALLOWED_ORIGINS = new Set([
+  "https://colony-qr.pages.dev",
+  "https://qr.colony.dpdns.org"
+]);
 const SESSION_DAYS = 30;
 const PASSWORD_ITERATIONS = 100000;
 const GOOGLE_KEYS_URL = "https://www.googleapis.com/oauth2/v3/certs";
@@ -128,8 +131,8 @@ function corsHeaders(origin) {
     "Vary": "Origin"
   };
 
-  if (origin === ALLOWED_ORIGIN) {
-    headers["Access-Control-Allow-Origin"] = ALLOWED_ORIGIN;
+  if (ALLOWED_ORIGINS.has(origin)) {
+    headers["Access-Control-Allow-Origin"] = origin;
     headers["Access-Control-Allow-Credentials"] = "true";
     headers["Access-Control-Allow-Methods"] =
       "GET, POST, PUT, PATCH, DELETE, OPTIONS";
@@ -2936,7 +2939,7 @@ export default {
     const headers = corsHeaders(origin);
     const url = new URL(request.url);
 
-    if (origin && origin !== ALLOWED_ORIGIN) {
+    if (origin && !ALLOWED_ORIGINS.has(origin)) {
       return reply({
         success: false,
         error: "Origin not allowed"

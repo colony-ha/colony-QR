@@ -3052,16 +3052,16 @@ export default {
         const state = url.searchParams.get("state") || "";
         const next = url.searchParams.get("next") === "dashboard" ? "dashboard" : "";
 
+        if (!/^[a-f0-9]{64}$/.test(state)) {
+          return reply({ success: false, error: "Invalid SSO state" }, 400, headers);
+        }
+
         if (!user) {
           const loginUrl = new URL("https://colony-qr.pages.dev/auth.html");
           loginUrl.searchParams.set("return", "market");
           loginUrl.searchParams.set("state", state);
           if (next) loginUrl.searchParams.set("next", next);
           return Response.redirect(loginUrl.toString(), 302);
-        }
-
-        if (!/^[a-f0-9]{64}$/.test(state)) {
-          return reply({ success: false, error: "Invalid SSO state" }, 400, headers);
         }
 
         const code = randomHex(32);

@@ -3078,7 +3078,8 @@ export default {
           VALUES (?, ?, ?, ?)
         `).bind(codeHash, user.id, expiresAt, stateHash).run();
 
-        const callback = new URL("https://colony-market.pages.dev/auth/callback");
+        const callback = new URL("https://colony-market.pages.dev/");
+        callback.searchParams.set("auth_callback", "1");
         callback.searchParams.set("code", code);
         callback.searchParams.set("state", state);
         return Response.redirect(callback.toString(), 302);

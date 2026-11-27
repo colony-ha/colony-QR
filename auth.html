@@ -49,6 +49,23 @@ fr:{headingLogin:"Bon retour",headingRegister:"Créer votre compte",subLogin:"Co
 ar:{headingLogin:"مرحباً بعودتك",headingRegister:"إنشاء حساب جديد",subLogin:"سجّل الدخول لإدارة حسابك في COLONY QR.",subRegister:"أنشئ حسابك وابدأ استخدام COLONY QR.",login:"تسجيل الدخول",register:"إنشاء حساب",name:"اسم المستخدم",email:"البريد الإلكتروني",password:"كلمة المرور",submitLogin:"تسجيل الدخول",submitRegister:"إنشاء حساب",back:"العودة إلى COLONY QR",needName:"يرجى إدخال اسم المستخدم.",usernameTaken:"اسم المستخدم هذا محجوز بالفعل. اختر اسماً آخر.",generic:"حدث خطأ. حاول مرة أخرى.",network:"تعذر الاتصال بالخادم. حاول مجدداً.",created:"تم إنشاء الحساب. قد تحتاج الجلسة إلى السماح بملفات تعريف الارتباط.",logged:"تم تسجيل الدخول بنجاح.",invalid:"البريد الإلكتروني أو كلمة المرور غير صحيحة.",passwordHint:"استعمل 12 حرفاً على الأقل.",googleLabel:"أو تابع باستخدام Google",googleHelp:"سجّل الدخول أو أنشئ حساباً بأمان عبر Google.",googleFailed:"فشل تسجيل الدخول عبر Google. حاول مجدداً.",googleConfig:"تسجيل الدخول عبر Google غير مهيأ بعد."}
 };
 function postLoginDestination(){const params=new URLSearchParams(location.search);const requested=params.get("return");if(requested==="market"){const state=params.get("state")||"";if(/^[a-f0-9]{64}$/.test(state)){const next=params.get("next")==="dashboard"?"&next=dashboard":"";return API+"/api/auth/market/authorize?state="+encodeURIComponent(state)+next;}}return ["generator.html","billing.html","digital-pages.html"].includes(requested)?requested:"dashboard.html";}
+async function continueToMarket(){
+ const params=new URLSearchParams(location.search);
+ const state=params.get("state")||"";
+ if(!/^[a-f0-9]{64}$/.test(state)){showMessage(words[language].generic,"error");return;}
+ const authorizeUrl=new URL(API+"/api/auth/market/authorize");
+ authorizeUrl.searchParams.set("state",state);
+ if(params.get("next")==="dashboard")authorizeUrl.searchParams.set("next","dashboard");
+ try{
+  const response=await fetch(authorizeUrl.toString(),{
+   method:"GET",credentials:"include",cache:"no-store",
+   headers:{"Accept":"application/json"}
+  });
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok||!data.success||!data.redirect_url)throw new Error(data.error||words[language].generic);
+  window.location.replace(data.redirect_url);
+ }catch(error){showMessage(error.message||words[language].network,"error");}
+}
 function showMessage(text,type){const box=$("message");box.textContent=text;box.className="message "+type}
 function render(){
  const t=words[language];document.documentElement.lang=language;document.documentElement.dir=language==="ar"?"rtl":"ltr";
@@ -75,7 +92,14 @@ $("authForm").onsubmit=async e=>{
   const response=await fetch(API+(mode==="login"?"/api/auth/login":"/api/auth/register"),{method:"POST",headers:{"Content-Type":"application/json"},credentials:"include",body:JSON.stringify(payload)});
   const data=await response.json();
   if(!response.ok){showMessage(data.error&&data.error.toLowerCase().includes("username already taken")?t.usernameTaken:(data.error==="Invalid email or password"?t.invalid:(data.error||t.generic)),"error")}
-  else{showMessage(mode==="login"?t.logged:t.created,"ok");setTimeout(()=>{window.location.href=postLoginDestination()},500)}
+  else{
+   showMessage(mode==="login"?t.logged:t.created,"ok");
+   if(new URLSearchParams(location.search).get("return")==="market"){
+    await continueToMarket();
+   }else{
+    setTimeout(()=>{window.location.href=postLoginDestination()},300);
+   }
+  }
  }catch(err){showMessage(t.network,"error")}
  finally{button.disabled=false}
 };
@@ -95,9 +119,11 @@ async function handleGoogleCredential(response, nonce) {
       return;
     }
     showMessage(t.logged, "ok");
-    const destination = postLoginDestination();
-    // Replace the login page immediately so the original market SSO state is preserved.
-    window.location.replace(destination);
+    if (new URLSearchParams(location.search).get("return") === "market") {
+      await continueToMarket();
+    } else {
+      window.location.replace(postLoginDestination());
+    }
   } catch (error) {
     showMessage(t.network, "error");
   }

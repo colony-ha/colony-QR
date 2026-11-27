@@ -1,0 +1,8 @@
+name = "colony-qr-api"
+main = "worker.js"
+compatibility_date = "2026-11-27"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "colony-qr-db"
+database_id = "bddd8c55-7025-45df-aace-2bc87dce587d"

@@ -2,7 +2,13 @@ name = "colony-qr-api"
 main = "worker.js"
 compatibility_date = "2026-11-27"
 
-# Cloudflare Git integration deployment configuration
+# Keep dashboard secrets (including MARKET_SSO_SECRET) during Git-based deploys.
+keep_vars = true
+
+# Google OAuth client ID is public and version-controlled so it cannot disappear.
+[vars]
+GOOGLE_CLIENT_ID = "1033431352294-1ai5lms77sviv6i7ek73mb4ls9gb57gt.apps.googleusercontent.com"
+
 [[d1_databases]]
 binding = "DB"
 database_name = "colony-qr-db"

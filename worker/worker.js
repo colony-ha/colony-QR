@@ -3083,6 +3083,12 @@ export default {
         callback.searchParams.set("auth_callback", "1");
         callback.searchParams.set("code", code);
         callback.searchParams.set("state", state);
+
+        // When called from the QR login page, return the callback URL as JSON.
+        // This keeps the partitioned QR session cookie in its QR-site context.
+        if ((request.headers.get("Accept") || "").includes("application/json")) {
+          return reply({ success: true, redirect_url: callback.toString() }, 200, headers);
+        }
         return Response.redirect(callback.toString(), 302);
       }
 

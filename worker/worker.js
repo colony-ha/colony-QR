@@ -3050,13 +3050,14 @@ export default {
       ) {
         const user = await currentUser(request, env);
         const state = url.searchParams.get("state") || "";
+        const next = url.searchParams.get("next") === "dashboard" ? "dashboard" : "";
 
         if (!user) {
-          return Response.redirect(
-            "https://colony-qr.pages.dev/auth.html?return=market&state=" +
-              encodeURIComponent(state),
-            302
-          );
+          const loginUrl = new URL("https://colony-qr.pages.dev/auth.html");
+          loginUrl.searchParams.set("return", "market");
+          loginUrl.searchParams.set("state", state);
+          if (next) loginUrl.searchParams.set("next", next);
+          return Response.redirect(loginUrl.toString(), 302);
         }
 
         if (!/^[a-f0-9]{64}$/.test(state)) {
@@ -3078,7 +3079,7 @@ export default {
           VALUES (?, ?, ?, ?)
         `).bind(codeHash, user.id, expiresAt, stateHash).run();
 
-        const callback = new URL("https://colony-market.pages.dev/");
+        const callback = new URL(next === "dashboard" ? "https://colony-market.pages.dev/dashboard.html" : "https://colony-market.pages.dev/");
         callback.searchParams.set("auth_callback", "1");
         callback.searchParams.set("code", code);
         callback.searchParams.set("state", state);

@@ -3041,6 +3041,114 @@ export default {
       }
 
       // --------------------------------------
+      // COLONY MARKET SINGLE SIGN-ON
+      // --------------------------------------
+
+      if (
+        url.pathname === "/api/auth/market/authorize" &&
+        request.method === "GET"
+      ) {
+        const user = await currentUser(request, env);
+        const state = url.searchParams.get("state") || "";
+
+        if (!user) {
+          return Response.redirect(
+            "https://colony-qr.pages.dev/auth.html?return=market&state=" +
+              encodeURIComponent(state),
+            302
+          );
+        }
+
+        if (!/^[a-f0-9]{64}$/.test(state)) {
+          return reply({ success: false, error: "Invalid SSO state" }, 400, headers);
+        }
+
+        const code = randomHex(32);
+        const codeHash = await sha256(code);
+        const stateHash = await sha256(state);
+        const now = new Date();
+        const expiresAt = new Date(now.getTime() + 60 * 1000).toISOString();
+
+        await env.DB.prepare(
+          "DELETE FROM market_auth_codes WHERE expires_at <= ?"
+        ).bind(now.toISOString()).run();
+
+        await env.DB.prepare(`
+          INSERT INTO market_auth_codes (code_hash, user_id, expires_at, state_hash)
+          VALUES (?, ?, ?, ?)
+        `).bind(codeHash, user.id, expiresAt, stateHash).run();
+
+        const callback = new URL("https://colony-market.pages.dev/auth/callback");
+        callback.searchParams.set("code", code);
+        callback.searchParams.set("state", state);
+        return Response.redirect(callback.toString(), 302);
+      }
+
+      if (
+        url.pathname === "/api/auth/market/exchange" &&
+        request.method === "POST"
+      ) {
+        if (
+          !env.MARKET_SSO_SECRET ||
+          !safeEqual(
+            request.headers.get("X-Market-SSO-Secret") || "",
+            env.MARKET_SSO_SECRET
+          )
+        ) {
+          return reply({ success: false, error: "Unauthorized SSO client" }, 401, headers);
+        }
+
+        const body = await readJson(request);
+        const code = String(body?.code || "");
+        const state = String(body?.state || "");
+
+        if (
+          !/^[a-f0-9]{64}$/.test(code) ||
+          !/^[a-f0-9]{64}$/.test(state)
+        ) {
+          return reply({ success: false, error: "Invalid authorization code" }, 400, headers);
+        }
+
+        const codeHash = await sha256(code);
+        const stateHash = await sha256(state);
+        const now = new Date().toISOString();
+
+        const redeemed = await env.DB.prepare(`
+          DELETE FROM market_auth_codes
+          WHERE code_hash = ?
+            AND state_hash = ?
+            AND expires_at > ?
+          RETURNING user_id
+        `).bind(codeHash, stateHash, now).first();
+
+        if (!redeemed) {
+          return reply({ success: false, error: "Authorization code expired or already used" }, 401, headers);
+        }
+
+        const user = await env.DB.prepare(`
+          SELECT id, email, display_name, role, status
+          FROM users
+          WHERE id = ? AND status = 'active'
+          LIMIT 1
+        `).bind(redeemed.user_id).first();
+
+        if (!user) {
+          return reply({ success: false, error: "Account unavailable" }, 403, headers);
+        }
+
+        return reply({
+          success: true,
+          user: {
+            id: user.id,
+            email: user.email,
+            display_name: user.display_name,
+            role: user.role
+          }
+        }, 200, headers);
+      }
+
+
+      // --------------------------------------
       // REGISTER
       // --------------------------------------
 

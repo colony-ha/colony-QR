@@ -95,7 +95,9 @@ async function handleGoogleCredential(response, nonce) {
       return;
     }
     showMessage(t.logged, "ok");
-    setTimeout(() => { window.location.href = postLoginDestination(); }, 500);
+    const destination = postLoginDestination();
+    // Replace the login page immediately so the original market SSO state is preserved.
+    window.location.replace(destination);
   } catch (error) {
     showMessage(t.network, "error");
   }
